@@ -34,6 +34,8 @@ export class DraftState extends IDraftState {
 				randomPicks?: number;
 				canalDredger?: boolean;
 				aetherSearcher?: { card: UniqueCard };
+				extraPicks?: number;
+				nextExtraPicks?: number;
 			};
 		};
 	} = {};
@@ -97,10 +99,12 @@ export class DraftState extends IDraftState {
 
 	picksAndBurnsThisRound(userID: UserID) {
 		const settings = this.getBoosterSettings();
-		const picksThisRound = Math.min(
-			settings.picks[Math.min(this.players[userID].pickNumber, settings.picks.length - 1)],
-			this.players[userID].boosters[0]?.length ?? 0
-		);
+		const picksThisRound =
+			(this.players[userID].effect?.extraPicks ?? 0) +
+			Math.min(
+				settings.picks[Math.min(this.players[userID].pickNumber, settings.picks.length - 1)],
+				this.players[userID].boosters[0]?.length ?? 0
+			);
 		return {
 			picksThisRound,
 			burnsThisRound: Math.min(

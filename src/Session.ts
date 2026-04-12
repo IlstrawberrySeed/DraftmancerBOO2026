@@ -2153,6 +2153,49 @@ export class Session implements IIndexable {
 					});
 					break;
 				}
+				case UsableDraftEffect.DiscerningHoarder: {
+					//LeovoldsOperative but backwards
+					//Strata BOO3, card by PixelAce
+					const settings = s.getBoosterSettings();
+					const prevPlayer = s.players[s.previousPlayer(userID)];
+					let nextBoosterLength = s.players[userID].boosters[1]?.length;
+					if (nextBoosterLength == undefined)
+						if (prevPlayer.boosters[0]?.length != undefined)
+							nextBoosterLength =
+								prevPlayer.boosters[0].length -
+								Math.min(
+									settings.picks[Math.min(prevPlayer.pickNumber, settings.picks.length - 1)],
+									prevPlayer.boosters[0]?.length ?? 0
+								);
+					if (nextBoosterLength == undefined)
+						return reportError(
+							"Cannot tell if there are enough cards in the next pack: Please try again later."
+						);
+					if (
+						1 +
+							Math.min(
+								settings.picks[Math.min(s.players[userID].pickNumber + 1, settings.picks.length - 1)],
+								s.players[userID].boosters[0]?.length ?? 0
+							) >=
+						nextBoosterLength
+					)
+						return reportError(
+							"You can't use DiscerningHoarder on this pack: Next pack doesn't have enough cards."
+						);
+
+					applyDraftEffects.push(() => {
+						if (!card.state) card.state = {};
+						card.state.faceUp = false;
+						notifyDraftEffectUse();
+						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
+						if (!s.players[userID].effect) s.players[userID].effect = {};
+						s.players[userID].effect.nextExtraPicks = (s.players[userID].effect.nextExtraPicks ?? 0) + 1;
+						picksThisRound -= 1;
+						pickedCards.pop();
+						_pickedCards.pop();
+					});
+					break;
+				}
 				case UsableDraftEffect.RemoveDraftCard: {
 					const removedCards = pickedCards.map((index) => booster[index]);
 					burnsThisRound += pickedCards.length;
@@ -2485,6 +2528,11 @@ export class Session implements IIndexable {
 			this.startCountdown(userID);
 			this.requestBotRecommendation(userID);
 		}
+
+		if (s.players[userID].effect?.nextExtraPicks) {
+			s.players[userID].effect.extraPicks = s.players[userID].effect?.nextExtraPicks;
+			s.players[userID].effect.nextExtraPicks = 0;
+		} else if (s.players[userID].effect?.extraPicks) s.players[userID].effect.extraPicks = 0;
 
 		return new SocketAck();
 	}
