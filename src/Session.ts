@@ -2103,6 +2103,7 @@ export class Session implements IIndexable {
 			switch (draftEffect.effect) {
 				// Draft Cogwork Librarian face up.
 				// As you draft a card, you may draft an additional card from that booster pack. If you do, put Cogwork Librarian into that booster pack.
+				
 				case UsableDraftEffect.CogworkLibrarian: {
 					if (picksThisRound >= booster.length)
 						return reportError("You can't use a Cogwork Librarian on this booster: Not enough cards.");
@@ -2312,6 +2313,26 @@ export class Session implements IIndexable {
 					`Choose a player with a Canal Dredger to pass '${booster[0].name}' to:`,
 					playersWithCanalDedger
 				);
+		}
+
+		for (const card of pickedCards.map((idx) => booster[idx])) {
+			if (card.draft_effects) {
+				for (const effect of card.draft_effects) {
+					switch (effect.type) {
+						case ParameterizedDraftEffectType.CantPick: {
+							if (Array.isArray(effect.pick))
+							{
+								if(effect.pick.includes(s.players[userID].pickNumber + 1))
+									return reportError(`You can't pick this card on this pick.`);
+							}
+							else
+								if (s.players[userID].pickNumber + 1 == effect.pick)
+									return reportError("You can't pick this card on this pick.");
+							break;
+						}
+					}
+				}
+			}
 		}
 
 		if (

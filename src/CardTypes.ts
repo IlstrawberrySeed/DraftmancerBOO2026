@@ -51,6 +51,7 @@ export type SimpleDraftEffectType =
 
 export enum ParameterizedDraftEffectType {
 	AddCards = "AddCards",
+	CantPick = "CantPick",
 }
 
 export type DraftEffectType = SimpleDraftEffectType | ParameterizedDraftEffectType;
@@ -59,7 +60,8 @@ export type DraftEffect =
 	| {
 			type: SimpleDraftEffectType;
 	  }
-	| { type: ParameterizedDraftEffectType.AddCards; count: number; cards: CardID[]; duplicateProtection: boolean };
+	| { type: ParameterizedDraftEffectType.AddCards; count: number; cards: CardID[]; duplicateProtection: boolean }
+	| { type: ParameterizedDraftEffectType.CantPick; pick: number | number[]; }
 
 export type CardFace = {
 	name: string;

@@ -280,6 +280,30 @@ export function validateCustomCard(inputCard: any): SocketError | Card {
 						cards: entry.cards,
 						duplicateProtection: entry.duplicateProtection ?? true,
 					});
+				} else if (entry.type === ParameterizedDraftEffectType.CantPick) {
+					if (!hasProperty("pick", isArrayOf(isInteger))(entry) && !hasProperty("pick", isInteger)(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'CantPick' entry in 'draft_effects' of custom card. Missing or invalid 'pick' parameter.`
+						);
+					}
+					if (Array.isArray(entry.pick))
+						if(entry.pick.some(num => num < 1))
+							return valErr(
+								`Invalid Parameter`,
+								`Invalid 'AddCards' entry in 'draft_effects' of custom card. Each 'pick' must be strictly positive.`
+							);
+						else;
+					else if (entry.pick < 1)
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. 'pick' must be strictly positive.`
+						);
+					// NOTE: Full verification of the cards will be done later, once the rest of the file is parsed.
+					card.draft_effects.push({
+						type: entry.type,
+						pick: entry.pick
+					});
 				} else {
 					return valErr(
 						`Invalid Property`,
