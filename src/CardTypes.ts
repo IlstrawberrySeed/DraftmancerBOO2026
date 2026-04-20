@@ -21,11 +21,13 @@ export enum OnPickDraftEffect {
 	CanalDredger = "CanalDredger",
 	AetherSearcher = "AetherSearcher",
 	ArchdemonOfPaliano = "ArchdemonOfPaliano",
+	ChaoticWrapper = "ChaoticWrapper",
 }
 
 // Same thing, but a may ability.
 export enum OptionalOnPickDraftEffect {
 	LoreSeeker = "LoreSeeker",
+	IllicitMarkets = "IllicitMarkets",
 }
 
 // Draft effect that can be activated after the card has been picked (generally while picking another card later).
@@ -47,11 +49,16 @@ export type SimpleDraftEffectType =
 	| UsableDraftEffect
 	| "TrackRemovedCardsNames"
 	| "TrackRemovedCardsSubtypes"
-	| "CogworkGrinder";
+	| "CogworkGrinder"
+	| "RemoveNotedCard"
+	| "NoteFaceUp";
 
 export enum ParameterizedDraftEffectType {
 	AddCards = "AddCards",
 	CantPick = "CantPick",
+	ReplaceNotedCard = "ReplaceNotedCard",
+	NoteQualityName = "NoteQualityName",
+	AddCardsOnReveal = "AddCardsOnReveal",
 }
 
 export type DraftEffectType = SimpleDraftEffectType | ParameterizedDraftEffectType;
@@ -61,7 +68,37 @@ export type DraftEffect =
 			type: SimpleDraftEffectType;
 	  }
 	| { type: ParameterizedDraftEffectType.AddCards; count: number; cards: CardID[]; duplicateProtection: boolean }
-	| { type: ParameterizedDraftEffectType.CantPick; pick: number | number[]; }
+	| { type: ParameterizedDraftEffectType.CantPick; pick: number | number[] }
+	| {
+			type: ParameterizedDraftEffectType.ReplaceNotedCard;
+			count: number;
+			cards: CardID[];
+			duplicateProtection: boolean;
+	  }
+	| {
+			type: ParameterizedDraftEffectType.AddCardsOnReveal;
+			count: number;
+			cards: CardID[];
+			duplicateProtection: boolean;
+	  }
+	| { type: ParameterizedDraftEffectType.NoteQualityName; qualities: QualityClause[] };
+
+export type QualityClause = QualityAtom[];
+
+export type QualityAtom =
+	| { kind: "Rarity"; value: CardRarity }
+	| { kind: "Type"; value: string }
+	| { kind: "Subtype"; value: string }
+	| { kind: "Color"; value: CardColor }
+	| { kind: "Supertype"; value: string };
+
+export enum QualityKind {
+	Rarity = "Rarity",
+	Type = "Type",
+	Subtype = "Subtype",
+	Color = "Color",
+	Supertype = "Supertype",
+}
 
 export type CardFace = {
 	name: string;
@@ -138,6 +175,7 @@ export type UniqueCardState = {
 	creatureTypes?: string[];
 	removedCards?: UniqueCard[];
 	colors?: CardColor[];
+	count?: number;
 };
 
 export class UniqueCard extends Card {

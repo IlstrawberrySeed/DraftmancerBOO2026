@@ -21,7 +21,13 @@ import { MinesweeperSyncData } from "@/MinesweeperDraftTypes";
 import { HousmanDraftSyncData } from "@/HousmanDraft";
 import { minesweeperApplyDiff } from "../../src/MinesweeperDraftTypes";
 import Constants, { CubeDescription, EnglishBasicLandNames } from "../../src/Constants";
-import { CardColor, OptionalOnPickDraftEffect, UsableDraftEffect } from "../../src/CardTypes";
+import {
+	CardColor,
+	OptionalOnPickDraftEffect,
+	UsableDraftEffect,
+	ParameterizedDraftEffectType,
+	hasEffect,
+} from "../../src/CardTypes";
 import { SolomonDraftSyncData } from "@/SolomonDraft";
 import { SilentAuctionDraftSyncData } from "@/SilentAuctionDraft";
 import { isSomeEnum } from "../../src/TypeChecks";
@@ -489,6 +495,124 @@ export default defineComponent({
 						title: "Disconnected!",
 						showConfirmButton: false,
 					});
+			});
+
+			this.socket.on("illicitMarketsPick", async (data, callback) => {
+				if (data.packCards.length < 2 || data.poolCards.length < 2) {
+					callback(null);
+					return;
+				}
+
+				const getCardLabel = (card: UniqueCard) =>
+					this.language in card.printed_names ? card.printed_names[this.language] : card.name;
+
+				const makeCheckboxList = (cards: UniqueCard[], groupName: string) =>
+					cards
+						.map(
+							(card) => `
+					<label style="display:block; text-align:left; margin:0.35em 0;">
+					<input type="checkbox" name="${groupName}" value="${card.uniqueID}">
+					${getCardLabel(card)}
+					</label>
+					`
+						)
+						.join("");
+
+				const pickExactlyTwo = async (
+					title: string,
+					text: string,
+					cards: UniqueCard[],
+					groupName: string
+				): Promise<[UniqueCardID, UniqueCardID] | null> => {
+					const result = await Alert.fire({
+						title,
+						text,
+						html: `<div style="max-height: 18rem; overflow-y: auto;">${makeCheckboxList(cards, groupName)}</div>`,
+						showCancelButton: true,
+						confirmButtonText: "Confirm",
+						cancelButtonText: "Cancel",
+						allowOutsideClick: false,
+						focusConfirm: false,
+						preConfirm: () => {
+							const checked = Array.from(
+								document.querySelectorAll(`input[name="${groupName}"]:checked`)
+							) as HTMLInputElement[];
+
+							if (checked.length !== 2) {
+								Swal.showValidationMessage("Choose exactly 2 cards.");
+								return null;
+							}
+
+							return checked.map((input) => Number(input.value)) as [UniqueCardID, UniqueCardID];
+						},
+					});
+
+					if (!result.isConfirmed || !result.value) return null;
+					return result.value;
+				};
+
+				const packCardIDs = await pickExactlyTwo(
+					"Illicit Markets",
+					"Choose 2 unchosen cards from the pack.",
+					data.packCards,
+					"illicit-pack"
+				);
+				if (!packCardIDs) {
+					callback(null);
+					return;
+				}
+
+				const poolCardIDs = await pickExactlyTwo(
+					"Illicit Markets",
+					"Choose 2 face-down cards from your card pool to return.",
+					data.poolCards,
+					"illicit-pool"
+				);
+				if (!poolCardIDs) {
+					callback(null);
+					return;
+				}
+
+				callback({
+					packCardIDs,
+					poolCardIDs,
+				});
+			});
+
+			this.socket.on("chaoticWrapperPick", async (data, callback) => {
+				if (
+					!data.cards ||
+					data.cards.length === 0 ||
+					data.cards.filter((card) => !(card.state?.faceUp ?? 0)).length === 0
+				) {
+					callback(null);
+					return;
+				}
+
+				const inputOptions: Record<string, string> = {};
+				for (const card of data.cards.filter((card) => !(card.state?.faceUp ?? 0))) {
+					inputOptions[String(card.uniqueID)] =
+						this.language in card.printed_names ? card.printed_names[this.language] : card.name;
+				}
+
+				const result = await Alert.fire({
+					title: `${data.wrappingPlayer.userName} picked ${data.sourceCard.name}`,
+					text: "Choose a card to put into the wrapped pack.",
+					input: "select",
+					inputOptions,
+					inputPlaceholder: "Select a card",
+					showCancelButton: true,
+					confirmButtonText: "Choose",
+					cancelButtonText: "Cancel",
+					allowOutsideClick: false,
+				});
+
+				if (!result.isConfirmed || !result.value) {
+					callback(null);
+					return;
+				}
+
+				callback(Number(result.value));
 			});
 
 			this.socket.io.on("reconnect", (attemptNumber) => {
@@ -1901,6 +2025,23 @@ export default defineComponent({
 							case UsableDraftEffect.RemoveDraftCard:
 								dontAddSelectedCardstoCardPool = true;
 								break;
+							case UsableDraftEffect.NoteCardName:
+							case UsableDraftEffect.NoteCreatureName:
+							case UsableDraftEffect.NoteCreatureTypes: {
+								let index = this.deck.findIndex((c) => c.uniqueID === draftEffect!.cardID);
+								let card;
+								if (index < 0)
+									index = this.sideboard.findIndex((c) => c.uniqueID === draftEffect!.cardID);
+								if (index < 0) fireToast("error", "Could not find the noting card...");
+								card = this.deck[index];
+								if (!card) fireToast("error", "Could not find the noting card...");
+								if (
+									hasEffect(card, "RemoveNotedCard") ||
+									hasEffect(card, ParameterizedDraftEffectType.ReplaceNotedCard)
+								)
+									dontAddSelectedCardstoCardPool = true;
+								break;
+							}
 						}
 						onSuccess.push(() => {
 							this.selectedUsableDraftEffect = undefined;
@@ -1917,6 +2058,11 @@ export default defineComponent({
 							effect: this.selectedOptionalDraftPickEffect.effect,
 							cardID: this.selectedOptionalDraftPickEffect.cardID,
 						};
+						switch (optionalOnPickDraftEffect!.effect) {
+							case OptionalOnPickDraftEffect.IllicitMarkets:
+								selectedCards.splice(selectedCards.indexOf(optionalOnPickDraftEffect.cardID));
+								break;
+						}
 						onSuccess.push(() => {
 							this.selectedOptionalDraftPickEffect = undefined;
 						});
@@ -3815,12 +3961,22 @@ export default defineComponent({
 			if (!this.draftState || !this.draftState.booster) return 1;
 			let picksThisRound: number = this.draftState.picksThisRound;
 
-			if (
-				this.selectedUsableDraftEffect &&
-				(this.selectedUsableDraftEffect.effect === UsableDraftEffect.CogworkLibrarian ||
-					this.selectedUsableDraftEffect.effect === UsableDraftEffect.LeovoldsOperative)
-			)
-				picksThisRound += 1;
+			if (this.selectedUsableDraftEffect)
+				switch (this.selectedUsableDraftEffect.effect) {
+					case UsableDraftEffect.CogworkLibrarian:
+					case UsableDraftEffect.LeovoldsOperative:
+						picksThisRound += 1;
+						break;
+					case UsableDraftEffect.DiscerningHoarder:
+						picksThisRound -= 1;
+						break;
+				}
+			if (this.selectedOptionalDraftPickEffect)
+				switch (this.selectedOptionalDraftPickEffect.effect) {
+					case OptionalOnPickDraftEffect.IllicitMarkets:
+						picksThisRound += 2;
+						break;
+				}
 
 			return Math.min(picksThisRound, this.draftState.booster.length);
 		},
@@ -3933,12 +4089,15 @@ export default defineComponent({
 				(c) => c.draft_effects !== undefined && this.selectedCards.includes(c.uniqueID)
 			);
 			for (const card of selectedCards)
-				for (const effect of card.draft_effects!.filter((e) => isSomeEnum(OptionalOnPickDraftEffect)(e.type)))
+				for (const effect of card.draft_effects!.filter((e) => isSomeEnum(OptionalOnPickDraftEffect)(e.type))) {
+					if (effect.type === OptionalOnPickDraftEffect.IllicitMarkets)
+						if ((this.draftState.booster?.length ?? 0) <= this.pickedCardsPerRound + 1) break;
 					r.push({
 						name: card.name,
 						effect: effect.type as OptionalOnPickDraftEffect,
 						cardID: card.uniqueID,
 					});
+				}
 			return r;
 		},
 		availableDraftEffects(): {
@@ -3959,6 +4118,7 @@ export default defineComponent({
 									UsableDraftEffect.NoteCreatureName,
 									UsableDraftEffect.NoteCreatureTypes,
 									UsableDraftEffect.AgentOfAcquisitions,
+									UsableDraftEffect.LeovoldsOperative,
 									UsableDraftEffect.LeovoldsOperative,
 								].includes(effect.type as UsableDraftEffect)) ||
 							// Disallow Cogwork Librarian effect if there's not enough cards in the pack.

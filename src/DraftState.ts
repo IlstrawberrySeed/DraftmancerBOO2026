@@ -26,6 +26,7 @@ export class DraftState extends IDraftState {
 			botInstance: IBot; // If a human player, this will be used for pick recommendations.
 			boosters: UniqueCard[][];
 			pickNumber: number;
+			totalPickNumber: number;
 			countdownInterval: NodeJS.Timer | null;
 			timer: number;
 			effect?: {
@@ -87,6 +88,7 @@ export class DraftState extends IDraftState {
 				botInstance: botInstance,
 				boosters: [],
 				pickNumber: 0,
+				totalPickNumber: 0,
 				countdownInterval: null,
 				timer: 0,
 			};
@@ -156,6 +158,7 @@ export class DraftState extends IDraftState {
 			boosterCount: this.players[userID].boosters.length,
 			boosterNumber: this.boosterNumber,
 			pickNumber: this.players[userID].pickNumber,
+			//totalPickNumber: this.players[userID].totalPickNumber, //May be nessessary to make things work
 			picksThisRound,
 			burnsThisRound,
 			skipPick:

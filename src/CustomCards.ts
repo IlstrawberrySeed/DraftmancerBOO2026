@@ -2,7 +2,7 @@ import parseCost from "./parseCost.js";
 import { escapeHTML } from "./utils.js";
 import { Card, CardColor, CardFace, ParameterizedDraftEffectType } from "./CardTypes.js";
 import { ackError, isMessageError, isSocketError, SocketAck, SocketError } from "./Message.js";
-import { isCard, isDraftEffectType, isSimpleDraftEffectType } from "./CardTypeCheck.js";
+import { isCard, isDraftEffectType, isSimpleDraftEffectType, isQualityAtom } from "./CardTypeCheck.js";
 import {
 	hasOptionalProperty,
 	hasProperty,
@@ -288,7 +288,7 @@ export function validateCustomCard(inputCard: any): SocketError | Card {
 						);
 					}
 					if (Array.isArray(entry.pick))
-						if(entry.pick.some(num => num < 1))
+						if (entry.pick.some((num) => num < 1))
 							return valErr(
 								`Invalid Parameter`,
 								`Invalid 'AddCards' entry in 'draft_effects' of custom card. Each 'pick' must be strictly positive.`
@@ -302,7 +302,80 @@ export function validateCustomCard(inputCard: any): SocketError | Card {
 					// NOTE: Full verification of the cards will be done later, once the rest of the file is parsed.
 					card.draft_effects.push({
 						type: entry.type,
-						pick: entry.pick
+						pick: entry.pick,
+					});
+				} else if (entry.type === ParameterizedDraftEffectType.AddCardsOnReveal) {
+					if (!hasProperty("cards", isArrayOf(isString))(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. Missing or invalid 'cards' parameter.`
+						);
+					}
+					if (!hasOptionalProperty("count", isInteger)(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. Invalid 'count' parameter.`
+						);
+					}
+					if (!hasOptionalProperty("duplicateProtection", isBoolean)(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. Invalid 'duplicateProtection' parameter.`
+						);
+					}
+					if (entry.count && entry.count <= 0)
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. 'count' must be strictly positive.`
+						);
+					// NOTE: Full verification of the cards will be done later, once the rest of the file is parsed.
+					card.draft_effects.push({
+						type: entry.type,
+						count: entry.count ?? 0, // NOTE: If 0, will be filled after validation (we want to set it to all cards, but their count is unknown until parsed)
+						cards: entry.cards,
+						duplicateProtection: entry.duplicateProtection ?? true,
+					});
+				} else if (entry.type === ParameterizedDraftEffectType.ReplaceNotedCard) {
+					if (!hasProperty("cards", isArrayOf(isString))(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. Missing or invalid 'cards' parameter.`
+						);
+					}
+					if (!hasOptionalProperty("count", isInteger)(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. Invalid 'count' parameter.`
+						);
+					}
+					if (!hasOptionalProperty("duplicateProtection", isBoolean)(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. Invalid 'duplicateProtection' parameter.`
+						);
+					}
+					if (entry.count && entry.count <= 0)
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'AddCards' entry in 'draft_effects' of custom card. 'count' must be strictly positive.`
+						);
+					// NOTE: Full verification of the cards will be done later, once the rest of the file is parsed.
+					card.draft_effects.push({
+						type: entry.type,
+						count: entry.count ?? 0, // NOTE: If 0, will be filled after validation (we want to set it to all cards, but their count is unknown until parsed)
+						cards: entry.cards,
+						duplicateProtection: entry.duplicateProtection ?? true,
+					});
+				} else if (entry.type === ParameterizedDraftEffectType.NoteQualityName) {
+					if (!hasProperty("qualities", isArrayOf(isArrayOf(isQualityAtom)))(entry)) {
+						return valErr(
+							`Invalid Parameter`,
+							`Invalid 'NoteQualityName' entry in 'draft_effects' of custom card. Missing or invalid 'qualities' parameter.`
+						);
+					}
+					card.draft_effects.push({
+						type: entry.type,
+						qualities: entry.qualities,
 					});
 				} else {
 					return valErr(

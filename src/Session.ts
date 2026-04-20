@@ -14,6 +14,8 @@ import {
 	UniqueCardState,
 	hasEffect,
 	ParameterizedDraftEffectType,
+	QualityAtom,
+	QualityKind,
 } from "./CardTypes.js";
 import {
 	Cards,
@@ -2004,6 +2006,7 @@ export class Session implements IIndexable {
 		}
 
 		++s.players[userID].pickNumber;
+		++s.players[userID].totalPickNumber;
 		if (s.players[userID].effect?.skipNPicks ?? 0 > 0) s.players[userID].effect!.skipNPicks!--;
 
 		this.stopCountdown(userID);
@@ -2070,6 +2073,176 @@ export class Session implements IIndexable {
 		let { picksThisRound, burnsThisRound } = s.picksAndBurnsThisRound(userID);
 
 		const updatedCardStates: { cardID: UniqueCardID; state: UniqueCardState }[] = [];
+
+		const RevealEffects = (card: Card) => {
+			console.log("Reveal Effect");
+			console.log(card.name);
+			if (card.draft_effects)
+				for (const effect of card.draft_effects) {
+					switch (effect.type) {
+						case ParameterizedDraftEffectType.AddCardsOnReveal: {
+							console.log("AddCardsOnReveal");
+							//picksThisRound += effect.count; //I think this is unnessessary
+							const additionalPicksCIDs: CardID[] = [];
+							if (effect.count === effect.cards.length) {
+								// Assume the user doesn't expect any randomness in this case.
+								additionalPicksCIDs.push(...effect.cards);
+							} else {
+								let availableCards: CardID[] = [];
+								for (let i = 0; i < effect.count; i++) {
+									if (availableCards.length === 0) {
+										availableCards = structuredClone(effect.cards);
+										random.shuffle(availableCards);
+									}
+									const picked = availableCards.splice(0, 1)[0];
+									// A card can be specified multiple times to increase its probability of being picked.
+									// Protect from duplicates by default, except when explicitely disabled.
+									if (effect.duplicateProtection)
+										availableCards = availableCards.filter((cid) => cid !== picked);
+									additionalPicksCIDs.push(picked);
+								}
+							}
+							const additionalPicks = additionalPicksCIDs.map((cid) =>
+								getUnique(cid, { getCard: this.getCustomGetCardFunction() })
+							);
+							// Mark cards with a usable effect as face-up, allowing their use from the card pool. On-Pick handled automatically. Optional On-Pick unsupported.
+							for (const card of additionalPicks) {
+								if (card.draft_effects?.find((e) => e.type === OnPickDraftEffect.FaceUp)) {
+									if (!card.state) card.state = {};
+									card.state.faceUp = true;
+								}
+							}
+							Connections[userID]?.pickedCards.main.push(...additionalPicks);
+							Connections[userID]?.socket.emit(
+								"addCards",
+								`Revealing '${card.name}' also added:`,
+								additionalPicks
+							);
+						}
+					}
+				}
+		};
+
+		const QualityCard = (card: Card, cardName: String, notedCard: Card) => {
+			// Assume: effect.type === ParameterizedDraftEffectType.NoteQualityName
+			// and effect.qualities: QualityClause[]
+			const effects = card.draft_effects?.filter(
+				(ef) => ef.type === ParameterizedDraftEffectType.NoteQualityName
+			);
+			if (!effects) return reportError("Card that has 'NoteQualityName' has no 'NoteQualityName'");
+			if (effects.length != 1)
+				return reportError("Card that has 'NoteQualityName' must have exactly 1 'NoteQualityName' effect.");
+			const effect = effects[0];
+
+			// Helper: match a single atom against a card
+			const matchesAtom = (card: Card, atom: QualityAtom): boolean => {
+				switch (atom.kind) {
+					case QualityKind.Rarity:
+						return card.rarity === atom.value;
+					case QualityKind.Type:
+						return card.type?.toLowerCase().split(" ").includes(atom.value.toLowerCase());
+					case QualityKind.Subtype:
+						return card.subtypes?.some((st) => st.toLowerCase() === atom.value.toLowerCase());
+					case QualityKind.Color:
+						return card.colors?.includes(atom.value);
+					case QualityKind.Supertype:
+						return card.type?.toLowerCase().includes(atom.value.toLowerCase());
+					default:
+						return false;
+				}
+			};
+
+			// Helper: pretty-print a clause for error messages
+			const atomToString = (atom: QualityAtom): string => {
+				switch (atom.kind) {
+					case QualityKind.Rarity:
+						return atom.value;
+					case QualityKind.Type:
+						return atom.value;
+					case QualityKind.Subtype:
+						return atom.value;
+					case QualityKind.Color:
+						return atom.value; // e.g., "G"
+					case QualityKind.Supertype:
+						return atom.value;
+					default:
+						return "Error: Valid but unhandled QualityKind in atomToString";
+				}
+			};
+
+			const clauseToString = (clause: QualityAtom[]): string => {
+				// (a OR b OR c)
+				if (clause.length === 1) return atomToString(clause[0]);
+				return `(${clause.map(atomToString).join(" OR ")})`;
+			};
+
+			// Evaluate: AND over clauses, OR within each clause
+			for (const clause of effect.qualities) {
+				const clauseMatches = clause.some((atom) => matchesAtom(notedCard, atom));
+
+				if (!clauseMatches) {
+					// Build a helpful message:
+					// e.g., "Card must be (rare OR mythic) AND Creature"
+					const requirement = effect.qualities.map(clauseToString).join(" AND ");
+					return reportError(`'${cardName}' does not satisfy required qualities: ${requirement}.`);
+				}
+			}
+			return;
+		};
+
+		const noteCardRiders = (card: Card) => {
+			const pickedCard = pickedCards[0];
+			if (hasEffect(card, "RemoveNotedCard") || hasEffect(card, ParameterizedDraftEffectType.ReplaceNotedCard)) {
+				burnsThisRound += 1;
+				picksThisRound -= 1;
+				pickedCards.shift();
+				if (pickedCard !== undefined) {
+					burnedCards.push(pickedCard);
+				}
+				if (hasEffect(card, ParameterizedDraftEffectType.ReplaceNotedCard) && card.draft_effects) {
+					const effect = card.draft_effects.filter(
+						(ef) => ef.type === ParameterizedDraftEffectType.ReplaceNotedCard
+					)[0];
+					const additionalPicksCIDs: CardID[] = [];
+					if (effect.count === effect.cards.length) {
+						// Assume the user doesn't expect any randomness in this case.
+						additionalPicksCIDs.push(...effect.cards);
+					} else {
+						let availableCards: CardID[] = [];
+						for (let i = 0; i < effect.count; i++) {
+							if (availableCards.length === 0) {
+								availableCards = structuredClone(effect.cards);
+								random.shuffle(availableCards);
+							}
+							const picked = availableCards.splice(0, 1)[0];
+							// A card can be specified multiple times to increase its probability of being picked.
+							// Protect from duplicates by default, except when explicitely disabled.
+							if (effect.duplicateProtection)
+								availableCards = availableCards.filter((cid) => cid !== picked);
+							additionalPicksCIDs.push(picked);
+						}
+					}
+					const additionalPicks = additionalPicksCIDs.map((cid) =>
+						getUnique(cid, { getCard: this.getCustomGetCardFunction() })
+					);
+					// Mark cards with a usable effect as face-up, allowing their use from the card pool. On-Pick handled automatically. Optional On-Pick unsupported.
+					for (const additionalCard of additionalPicks) {
+						if (
+							additionalCard.draft_effects?.find((e) => e.type === OnPickDraftEffect.FaceUp) ||
+							hasEffect(card, "NoteFaceUp")
+						) {
+							if (!additionalCard.state) additionalCard.state = {};
+							additionalCard.state.faceUp = true;
+						}
+					}
+					Connections[userID]?.pickedCards.main.push(...additionalPicks);
+				}
+			} else if (hasEffect(card, "NoteFaceUp")) {
+				if (!booster[pickedCard].state) booster[pickedCard].state = {};
+				booster[pickedCard].state.faceUp = true;
+			} else RevealEffects(booster[pickedCards[0]]);
+		};
+
 		// Conspiracy draft matter cards
 		const applyDraftEffects: (() => void)[] = []; // Delay effects after we're sure the pick is valid.
 		if (draftEffect) {
@@ -2103,7 +2276,7 @@ export class Session implements IIndexable {
 			switch (draftEffect.effect) {
 				// Draft Cogwork Librarian face up.
 				// As you draft a card, you may draft an additional card from that booster pack. If you do, put Cogwork Librarian into that booster pack.
-				
+
 				case UsableDraftEffect.CogworkLibrarian: {
 					if (picksThisRound >= booster.length)
 						return reportError("You can't use a Cogwork Librarian on this booster: Not enough cards.");
@@ -2181,9 +2354,13 @@ export class Session implements IIndexable {
 						nextBoosterLength
 					)
 						return reportError(
-							"You can't use DiscerningHoarder on this pack: Next pack doesn't have enough cards."
+							"You can't use Discerning Hoarder on this pack: Next pack doesn't have enough cards."
 						);
-
+					picksThisRound -= 1;
+					if (picksThisRound < 0)
+						return reportError("You can't use Discerning Hoarder on this pack: No pick to skip.");
+					if (picksThisRound != pickedCards.length)
+						return reportError("No skipped pick for Discerning Hoarder .");
 					applyDraftEffects.push(() => {
 						if (!card.state) card.state = {};
 						card.state.faceUp = false;
@@ -2191,9 +2368,6 @@ export class Session implements IIndexable {
 						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
 						if (!s.players[userID].effect) s.players[userID].effect = {};
 						s.players[userID].effect.nextExtraPicks = (s.players[userID].effect.nextExtraPicks ?? 0) + 1;
-						picksThisRound -= 1;
-						pickedCards.pop();
-						_pickedCards.pop();
 					});
 					break;
 				}
@@ -2213,33 +2387,51 @@ export class Session implements IIndexable {
 					break;
 				}
 				case UsableDraftEffect.NoteCardName: {
-					const cardName = booster[pickedCards[0]].name;
+					const notedCard = booster[pickedCards[0]];
+					const cardName = notedCard.name;
+					if (hasEffect(card, ParameterizedDraftEffectType.NoteQualityName)) {
+						const error = QualityCard(card, cardName, notedCard);
+						if (error) return error;
+					}
 					applyDraftEffects.push(() => {
 						if (!card.state) card.state = {};
 						card.state.faceUp = false;
 						notifyDraftEffectUse();
 						card.state.cardName = cardName;
 						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
+						noteCardRiders(card);
 					});
 					break;
 				}
 				case UsableDraftEffect.NoteCreatureName: {
 					if (!booster[pickedCards[0]].type.includes("Creature"))
-						return reportError("Pick should be a creature.");
-					const creatureName = booster[pickedCards[0]].name;
+						return reportError("Pick sho{type: Puld be a creature.");
+					const notedCreature = booster[pickedCards[0]];
+					const creatureName = notedCreature.name;
+					if (hasEffect(card, ParameterizedDraftEffectType.NoteQualityName)) {
+						const error = QualityCard(card, creatureName, notedCreature);
+						if (error) return error;
+					}
 					applyDraftEffects.push(() => {
 						if (!card.state) card.state = {};
 						card.state.faceUp = false;
 						notifyDraftEffectUse();
 						card.state.creatureName = creatureName;
 						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
+						noteCardRiders(card);
 					});
 					break;
 				}
 				case UsableDraftEffect.NoteCreatureTypes: {
 					if (!booster[pickedCards[0]].type.includes("Creature"))
 						return reportError("Pick should be a creature.");
-					const creatureTypes = booster[pickedCards[0]].subtypes;
+					const notedCreature = booster[pickedCards[0]];
+					const creatureName = notedCreature.name;
+					const creatureTypes = notedCreature.subtypes;
+					if (hasEffect(card, ParameterizedDraftEffectType.NoteQualityName)) {
+						const error = QualityCard(card, creatureName, notedCreature);
+						if (error) return error;
+					}
 
 					applyDraftEffects.push(() => {
 						if (!card.state) card.state = {};
@@ -2247,6 +2439,7 @@ export class Session implements IIndexable {
 						notifyDraftEffectUse();
 						card.state.creatureTypes = creatureTypes;
 						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
+						noteCardRiders(card);
 					});
 					break;
 				}
@@ -2294,8 +2487,117 @@ export class Session implements IIndexable {
 							}
 							s.players[userID].boosters.unshift(additionalBooster[0]);
 							notify(`${Connections[userID].userName} used the effect of 'Lore Seeker'.`);
+							RevealEffects(booster[pickedCards[0]]);
 						});
 					}
+					break;
+				}
+				case OptionalOnPickDraftEffect.IllicitMarkets: {
+					const index = booster.findIndex((c) => c.uniqueID === optionalOnPickDraftEffect.cardID);
+					if (index < 0 || !hasEffect(booster[index], OptionalOnPickDraftEffect.IllicitMarkets))
+						return reportError("Invalid draft effect card.");
+					if (!pickedCards.includes(index))
+						return reportError("You must pick Illicit Markets to use its effect.");
+					const card = booster[index];
+
+					const illicitMarketPick = async (
+						sourceCard: UniqueCard,
+						packCards: UniqueCard[],
+						poolCards: UniqueCard[]
+					): Promise<{
+						packCardIDs: [UniqueCardID, UniqueCardID];
+						poolCardIDs: [UniqueCardID, UniqueCardID];
+					} | null> => {
+						if (!Connections[userID]?.socket) return null;
+
+						return await new Promise((resolve) => {
+							Connections[userID].socket.timeout(60 * 1000).emit(
+								"illicitMarketsPick",
+								{
+									sourceCard,
+									packCards,
+									poolCards,
+								},
+								(
+									err: Error | null,
+									response?: {
+										packCardIDs: [UniqueCardID, UniqueCardID];
+										poolCardIDs: [UniqueCardID, UniqueCardID];
+									} | null
+								) => {
+									if (err || !response) {
+										resolve(null);
+										return;
+									}
+									resolve(response);
+								}
+							);
+						});
+					};
+
+					if (!s.players[userID].effect) s.players[userID].effect = {};
+					const availablePackCards = booster.filter((_, idx) => !pickedCards.includes(idx));
+					let cardPool = booster;
+					if (s.players[userID].isBot) return reportError("Bots cannot use Illicit Markets.");
+					else cardPool = Connections[userID].pickedCards.main.concat(Connections[userID].pickedCards.side);
+					cardPool = cardPool.filter((card) => !card.state?.faceUp);
+					const result = await illicitMarketPick(card, availablePackCards, cardPool);
+					if (!result) return reportError("Failed to retrieve choices for Illicit Markets.");
+					const newCards: [UniqueCardID, UniqueCardID] = result.packCardIDs;
+					const retCards = result.poolCardIDs;
+
+					const FindInPoolByUniqueID = (uid: UniqueCardID): UniqueCard | null => {
+						const main = Connections[userID].pickedCards.main;
+						let idx = main.findIndex((c) => c.uniqueID === uid);
+						if (idx >= 0) return main[idx];
+
+						const side = Connections[userID].pickedCards.side;
+						idx = side.findIndex((c) => c.uniqueID === uid);
+						if (idx >= 0) return side[idx];
+
+						return null;
+					};
+
+					const card1 = FindInPoolByUniqueID(retCards[0]);
+					const card2 = FindInPoolByUniqueID(retCards[1]);
+					const selectedPackCards = newCards
+						.map((uid) => booster.findIndex((c) => c.uniqueID === uid))
+						.filter((idx) => idx >= 0);
+					if (!card1 || !card2 || !selectedPackCards || selectedPackCards.length != 2)
+						return reportError("Failed to select cards for 'Illicit Markets.'");
+
+					applyDraftEffects.push(async () => {
+						if (!card.state) card.state = {};
+						if (!card.state.count) card.state.count = 0;
+						card.state.count += 1;
+						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
+
+						picksThisRound += 1;
+
+						const RemoveFromPoolByUniqueID = (uid: UniqueCardID): UniqueCard | null => {
+							const main = Connections[userID].pickedCards.main;
+							let idx = main.findIndex((c) => c.uniqueID === uid);
+							if (idx >= 0) return main.splice(idx, 1)[0];
+
+							const side = Connections[userID].pickedCards.side;
+							idx = side.findIndex((c) => c.uniqueID === uid);
+							if (idx >= 0) return side.splice(idx, 1)[0];
+
+							return null;
+						};
+						RevealEffects(card1);
+						RevealEffects(card2);
+						RemoveFromPoolByUniqueID(retCards[0]);
+						RemoveFromPoolByUniqueID(retCards[1]);
+						const pickedPos = pickedCards.indexOf(index);
+						if (pickedPos >= 0) pickedCards.splice(pickedPos, 1);
+
+						pickedCards.push(selectedPackCards[0], selectedPackCards[1]);
+						notify(
+							`${Connections[userID].userName} used the effect of 'Illicit Markets,' returning '${card1.name}' and '${card2.name}'.`
+						);
+						return;
+					});
 					break;
 				}
 			}
@@ -2320,14 +2622,11 @@ export class Session implements IIndexable {
 				for (const effect of card.draft_effects) {
 					switch (effect.type) {
 						case ParameterizedDraftEffectType.CantPick: {
-							if (Array.isArray(effect.pick))
-							{
-								if(effect.pick.includes(s.players[userID].pickNumber + 1))
+							if (Array.isArray(effect.pick)) {
+								if (effect.pick.includes(s.players[userID].totalPickNumber + 1))
 									return reportError(`You can't pick this card on this pick.`);
-							}
-							else
-								if (s.players[userID].pickNumber + 1 == effect.pick)
-									return reportError("You can't pick this card on this pick.");
+							} else if (s.players[userID].totalPickNumber + 1 == effect.pick)
+								return reportError("You can't pick this card on this pick.");
 							break;
 						}
 					}
@@ -2415,6 +2714,7 @@ export class Session implements IIndexable {
 			);
 			this.emitToConnectedUsers("message", msg);
 			s.players[userID].effect!.aetherSearcher = undefined;
+			noteCardRiders(booster[pickedCards[0]]);
 		}
 
 		for (const card of pickedCards.map((idx) => booster[idx])) {
@@ -2426,9 +2726,115 @@ export class Session implements IIndexable {
 							if (!card.state) card.state = {};
 							card.state.faceUp = true;
 							updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
-						// Intended fallthrough
+							notify = true;
+							break;
+						// Removed fallthrough for RevealEffects
 						case OnPickDraftEffect.Reveal:
 							notify = true;
+							RevealEffects(booster[pickedCards[0]]);
+							break;
+						case OnPickDraftEffect.ChaoticWrapper:
+							type PoolEntry = {
+								card: UniqueCard;
+								list: "main" | "side";
+							};
+
+							const chooseChaoticWrapperCard = async (targetID: UserID): Promise<PoolEntry | null> => {
+								const pool: PoolEntry[] = [
+									...Connections[targetID].pickedCards.main.map((pickedCard) => ({
+										card: pickedCard,
+										list: "main" as const,
+									})),
+									...Connections[targetID].pickedCards.side.map((pickedCard) => ({
+										card: pickedCard,
+										list: "side" as const,
+									})),
+								];
+
+								if (pool.length === 0) return null;
+
+								// Bots, disconnected users, or users without a live socket fall back to a random choice.
+								if (
+									s.players[targetID].isBot ||
+									this.isDisconnected(targetID) ||
+									!Connections[targetID]?.socket
+								) {
+									return getRandom(pool);
+								}
+
+								const fallback = () => getRandom(pool);
+
+								return await new Promise<PoolEntry>((resolve) => {
+									Connections[targetID].socket.timeout(60 * 1000).emit(
+										"chaoticWrapperPick",
+										{
+											wrappingPlayer: {
+												userID,
+												userName: Connections[userID]?.userName ?? userID,
+											},
+											sourceCard: card,
+											cards: pool.map((entry) => entry.card),
+										},
+										(err: Error | null, selectedCardID?: UniqueCardID | null) => {
+											if (err || !selectedCardID) {
+												resolve(fallback());
+												return;
+											}
+
+											const selected = pool.find(
+												(entry) => entry.card.uniqueID === selectedCardID
+											);
+											resolve(selected ?? fallback());
+										}
+									);
+								});
+							};
+
+							const wrappedPack: UniqueCard[] = [];
+							const draftedPlayers = Object.keys(s.players) as UserID[];
+							const humanPlayers = draftedPlayers.filter(
+								(targetID) => !s.players[targetID].isBot && !!Connections[targetID]?.pickedCards
+							);
+							const botPlayers = draftedPlayers.filter((targetID) => s.players[targetID].isBot);
+
+							for (const targetID of humanPlayers) {
+								const chosen = await chooseChaoticWrapperCard(targetID);
+								if (!chosen) continue;
+
+								const sourcePool = Connections[targetID].pickedCards[chosen.list];
+								const removeIndex = sourcePool.findIndex(
+									(pickedCard) => pickedCard.uniqueID === chosen.card.uniqueID
+								);
+								if (removeIndex < 0) continue;
+
+								wrappedPack.push(sourcePool.splice(removeIndex, 1)[0]);
+							}
+
+							for (const targetID of botPlayers) {
+								const botPool = s.players[targetID].botInstance.cards;
+								if (!botPool || botPool.length === 0) continue;
+
+								const chosenIndex = Math.floor(Math.random() * botPool.length);
+								const chosenCard = botPool.splice(chosenIndex, 1)[0];
+
+								const unique = getUnique(chosenCard.id, {
+									getCard: this.getCustomGetCardFunction(),
+								});
+
+								wrappedPack.push(unique);
+							}
+
+							if (wrappedPack.length > 0) {
+								s.players[userID].boosters.unshift(wrappedPack);
+
+								const msg = new ToastMessage(
+									`${Connections[userID].userName} picked ${card.name} and wrapped a new ${wrappedPack.length}-card booster.`
+								);
+								this.forUsers((uid) => {
+									if (uid !== userID) Connections[uid]?.socket.emit("message", msg, true);
+								});
+							}
+
 							break;
 						case OnPickDraftEffect.NotePassingPlayer:
 							if (!card.state) card.state = {};
@@ -2540,7 +2946,7 @@ export class Session implements IIndexable {
 		for (const idx of cardsToRemove) booster.splice(idx, 1);
 
 		++s.players[userID].pickNumber;
-
+		++s.players[userID].totalPickNumber;
 		this.passBooster(booster, userID, nextPlayer);
 
 		this.sendDraftState(userID);
@@ -2688,6 +3094,7 @@ export class Session implements IIndexable {
 
 		const booster = s.players[userID].boosters.splice(0, 1)[0];
 		++s.players[userID].pickNumber;
+		++s.players[userID].totalPickNumber;
 
 		// We're actually picking on behalf of a disconnected player
 		if (!s.players[userID].isBot && this.isDisconnected(userID))

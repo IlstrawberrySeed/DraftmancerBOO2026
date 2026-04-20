@@ -9,6 +9,10 @@ import {
 	UsableDraftEffect,
 	DraftEffect,
 	ParameterizedDraftEffectType,
+	QualityKind,
+	CardRarity,
+	CardColor,
+	QualityAtom,
 } from "./CardTypes.js";
 import {
 	hasOptionalProperty,
@@ -34,7 +38,13 @@ export function isSimpleDraftEffectType(str: unknown): str is SimpleDraftEffectT
 		(isSomeEnum(OnPickDraftEffect)(str) ||
 			isSomeEnum(OptionalOnPickDraftEffect)(str) ||
 			isSomeEnum(UsableDraftEffect)(str) ||
-			["TrackRemovedCardsNames", "TrackRemovedCardsSubtypes", "CogworkGrinder"].includes(str))
+			[
+				"TrackRemovedCardsNames",
+				"TrackRemovedCardsSubtypes",
+				"CogworkGrinder",
+				"RemoveNotedCard",
+				"NoteFaceUp",
+			].includes(str))
 	);
 }
 
@@ -49,7 +59,33 @@ export function isDraftEffect(obj: unknown): obj is DraftEffect {
 		return hasProperty("count", isInteger)(obj) && hasProperty("cards", isArrayOf(isString))(obj);
 	if (obj.type === ParameterizedDraftEffectType.CantPick)
 		return hasProperty("pick", isInteger)(obj) || hasProperty("pick", isArrayOf(isInteger))(obj);
+	if (obj.type === ParameterizedDraftEffectType.ReplaceNotedCard)
+		return hasProperty("count", isInteger)(obj) && hasProperty("cards", isArrayOf(isString))(obj);
+	if (obj.type === ParameterizedDraftEffectType.AddCardsOnReveal)
+		return hasProperty("count", isInteger)(obj) && hasProperty("cards", isArrayOf(isString))(obj);
+	if (obj.type === ParameterizedDraftEffectType.NoteQualityName)
+		return hasProperty("qualities", isArrayOf(isArrayOf(isQualityAtom)))(obj);
 	return hasProperty("type", isSimpleDraftEffectType)(obj);
+}
+
+export function isQualityAtom(obj: unknown): obj is QualityAtom {
+	if (!isObject(obj)) return false;
+	if (!hasProperty("kind", isSomeEnum(QualityKind))(obj)) return false;
+
+	switch (obj.kind) {
+		case QualityKind.Rarity:
+			return hasProperty("value", isString)(obj);
+		case QualityKind.Type:
+			return hasProperty("value", isString)(obj);
+		case QualityKind.Subtype:
+			return hasProperty("value", isString)(obj);
+		case QualityKind.Color:
+			return hasProperty("value", isSomeEnum(CardColor))(obj);
+		case QualityKind.Supertype:
+			return hasProperty("value", isString)(obj);
+		default:
+			return false;
+	}
 }
 
 export function isCardFace(obj: unknown): obj is CardFace {
