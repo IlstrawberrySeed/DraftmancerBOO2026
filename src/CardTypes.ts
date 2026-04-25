@@ -22,6 +22,7 @@ export enum OnPickDraftEffect {
 	AetherSearcher = "AetherSearcher",
 	ArchdemonOfPaliano = "ArchdemonOfPaliano",
 	ChaoticWrapper = "ChaoticWrapper",
+	MakeshiftConfiguration = "MakeshiftConfiguration",
 }
 
 // Same thing, but a may ability.
@@ -40,6 +41,7 @@ export enum UsableDraftEffect {
 	NoteCardName = "NoteCardName",
 	NoteCreatureName = "NoteCreatureName",
 	NoteCreatureTypes = "NoteCreatureTypes",
+	NoteUndraftedNames = "NoteUndraftedNames",
 }
 
 // Draft effects without parameters
@@ -170,12 +172,15 @@ export type UniqueCardState = {
 	faceUp?: boolean;
 	cardsDraftedThisRound?: number;
 	passingPlayer?: string;
-	cardName?: string;
+	cardName?: string | string[];
 	creatureName?: string;
 	creatureTypes?: string[];
 	removedCards?: UniqueCard[];
 	colors?: CardColor[];
 	count?: number;
+	manaValue?: number | string;
+	power?: number | string;
+	toughness?: number | string;
 };
 
 export class UniqueCard extends Card {

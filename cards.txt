@@ -1,0 +1,391 @@
+[CustomCards]
+[
+	{	
+		"name": "Discerning Hoarder",
+		"mana_cost": "{2}{W}",
+		"type": "Creature",
+		#image,
+		"colors": ["W"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "common",
+		"subtypes": [
+			"Spirit"
+		],
+		"rating": 3,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "DiscerningHoarder"],
+		#"oracle_text": ,
+		"power": 2,
+		"toughness": 4
+		#"loyalty": 
+	},
+	{	
+		"name": "Chaotic Wrapper",
+		"mana_cost": "{2}{R}",
+		"type": "Creature",
+		#image,
+		"colors": ["R"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+			"Beast",
+			"Theif"
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", {"type": "CantPick", "pick": [1,2,3]}, "ChaoticWrapper"],
+		#"oracle_text": ,
+		"power": 3,
+		"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Urza's Grand Design",
+		"mana_cost": "",
+		"type": "Conspiracy",
+		#image,
+		"colors": [],
+		"set": "BO3",
+		#collector number,
+		"rarity": "special",
+		"subtypes": [
+		],
+		"rating": 5,
+		#"layout": ,
+		#"back": ,
+		# "related_cards": [""]
+		#"draft_effects": ,
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Courtier's Gambit",
+		"mana_cost": "",
+		"type": "Conspiracy",
+		#image,
+		"colors": [],
+		"set": "BO3",
+		#collector number,
+		"rarity": "uncommon",
+		"subtypes": [
+		],
+		"rating": 3,
+		#"layout": ,
+		#"back": ,
+		"related_cards": ["Urza's Grand Design"]
+		#"draft_effects": ,
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Shambling Corpse",
+		"mana_cost": "{1}{B}",
+		"type": "Creature",
+		#image,
+		"colors": ["B"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "common",
+		"subtypes": [
+			"Zombie"
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		"related_cards": ["Murder"],
+		"draft_effects": ["FaceUp", "NoteCardName", "NoteFaceUp", {"type": "ReplaceNotedCard", "count": 1, "cards": ["Murder (pM19) 110"]}],
+		#"oracle_text": ,
+		"power": 2,
+		"toughness": 2
+		#"loyalty": 
+	},
+	{	
+		"name": "Guild Master Facade",
+		"mana_cost": "",
+		"type": "Conspiracy",
+		#image,
+		"colors": ["B"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "mythic",
+		"subtypes": [
+		],
+		"rating": 3,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "NoteFaceUp", { "type": "NoteQualityName", 
+				"qualities": [
+					[ 	{ "kind": "Rarity", "value": "rare" },
+						{ "kind": "Rarity", "value": "mythic" },
+						{ "kind": "Rarity", "value": "special" }
+					], 
+					[ { "kind": "Type", "value": "Creature" }, ]
+				] }]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "_",
+		"mana_cost": "",
+		"type": "Creature",
+		#image,
+		"colors": ["G"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+		],
+		"rating": 3,
+		#"layout": ,
+		"back": {
+			"name": "Colossal Dreadmount",
+			#"image": ,
+			"type": "Creature",
+			"subtypes": [
+				"Dinosour",
+				"Mount"
+			],
+			"mana_cost": "{3}{G}{G}",
+			#"oracle_text": ,
+			"power": 6,
+			"toughness": 5
+			#"loyaly": ,
+			#"layout": 
+		},
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "NoteFaceUp", { "type": "NoteQualityName", 
+				"qualities": [
+					[ { "kind": "Color", "value": "G" }, ], 
+					[ { "kind": "Type", "value": "Creature" }, ]
+				] }]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Naritive Fracture",
+		"mana_cost": "{3}{U/P}",
+		"type": "Instant",
+		#image,
+		"colors": ["U"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+			"Lesson",
+		],
+		"rating": 4,
+		"layout": "split-left",
+		"back": {
+			"name": "",
+			#"image": ,
+			"type": "Sorcery",
+			"subtypes": [
+			],
+			"mana_cost": "{U}",
+			#"oracle_text": ,
+			#"power": 6,
+			#"toughness": 5
+			#"loyaly": ,
+			"layout": "split-left"
+		},
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "NoteFaceUp", { "type": "NoteQualityName", "qualities": [ [ { "kind": "Type", "value": "Sorcery" }, ] ] }]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Dungeon Delve",
+		"mana_cost": "{1}{W}",
+		"type": "Sorcery",
+		#image,
+		"colors": ["W"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "common",
+		"subtypes": [
+			"Omen",
+		],
+		"rating": 3,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteCardName", "NoteFaceUp", { "type": "NoteQualityName", 
+				"qualities": [
+					[	{ "kind": "Rarity", "value": "common" }, 
+						{ "kind": "Rarity", "value": "uncommon"}
+					], 
+					[ 	{ "kind": "Type", "value": "Instant" },
+ 						{ "kind": "Type", "value": "Sorcery" },
+					]
+				] }]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Illicit Markets",
+		"mana_cost": "",
+		"type": "Conspiracy",
+		#image,
+		"colors": ["R"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "uncommon",
+		"subtypes": [
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["IllicitMarkets"]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Pheldagrif's Assistance",
+		"mana_cost": "",
+		"type": "Kindred",
+		#image,
+		"colors": ["W", "B", "G"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "uncommon",
+		"subtypes": [
+			"Pheldagrif"
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": [{"type": "AddCardsOnReveal", "count": 1, "cards": ["Snow-Covered Plains"]}]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Sage of Thermodynamics",
+		"mana_cost": "{1}{R}{R}",
+		"type": "Creature",
+		#image,
+		"colors": ["R"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+			"Human",
+			"Warlock",
+		],
+		"rating": 3,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["Reveal", {"type": "AddCards", "count": 3, "cards": ["Snow-Covered Mountain", "Snow-Covered Mountain", "Snow-Covered Mountain"], "duplicateProtection": false,}],
+		#"oracle_text": ,
+		"power": 2,
+		"toughness": 2
+		#"loyalty": 
+	},
+	{	
+		"name": "Super Chaos Warp",
+		"mana_cost": "{3}{R}",
+		"type": "Instant",
+		#image,
+		"colors": ["R"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+		],
+		"rating": 3,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteCardName", {"type": "ReplaceNotedCard", "count": 1, "cards": ["Chaos Warp"]}]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Super Booster Tutor",
+		"mana_cost": "{1}{B}",
+		"type": "Sorcery",
+		#image,
+		"colors": ["B"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+		],
+		"rating": 3,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteUndraftedNames"]
+		#"oracle_text": ,
+		#"power": 3,
+		#"toughness": 3
+		#"loyalty": 
+	},
+	{	
+		"name": "Makeshift Configuration",
+		"mana_cost": "{X}",
+		"type": "Artifact Creature",
+		#image,
+		"colors": [],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+		],
+		"rating": 4,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteUndraftedNames"],
+		#"oracle_text": ,
+		"power": "Y",
+		"toughness": "Z"
+		#"loyalty": 
+	}
+]
+
+[MainSheet]
+2 Discerning Hoarder
+2 Chaotic Wrapper
+1 Courtier's Gambit
+1 Shambling Corpse
+1 Guild Master Facade 
+2 _
+2 Naritive Fracture
+1 Dungeon Delve
+2 Illicit Markets
+1 Pheldagrif's Assistance
+1 Super Chaos Warp
+1 Sage of Thermodynamics
+1 Super Booster Tutor
+90 Makeshift Configuration
+72 Mountain
+90 Wheel of Fortune
+90 Dryad Arbor 

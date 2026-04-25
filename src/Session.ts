@@ -83,7 +83,7 @@ import { parseLine } from "./parseCardList.js";
 import { WinchesterDraftState, isWinchesterDraftState } from "./WinchesterDraft.js";
 import { HousmanDraftState, isHousmanDraftState } from "./HousmanDraft.js";
 import { SolomonDraftState, isSolomonDraftState } from "./SolomonDraft.js";
-import { isSomeEnum } from "./TypeChecks.js";
+import { isSomeEnum, isArray, isNumber } from "./TypeChecks.js";
 import { askColors, choosePlayer } from "./Conspiracy.js";
 import { InProduction, InTesting, TestingOnly } from "./Context.js";
 
@@ -2443,6 +2443,27 @@ export class Session implements IIndexable {
 					});
 					break;
 				}
+				case UsableDraftEffect.NoteUndraftedNames: {
+					const notedCards = booster
+						.filter((ele, ind) => !pickedCards.includes(ind))
+						.filter(
+							(c) =>
+								!(
+									hasEffect(card, ParameterizedDraftEffectType.NoteQualityName) &&
+									QualityCard(card, c.name, c)
+								)
+						);
+					const cardNames = notedCards.map((c) => c.name);
+					if (cardNames.length == 0) return reportError("Cannot use NoteUndraftedNames, No names to note");
+					applyDraftEffects.push(() => {
+						if (!card.state) card.state = {};
+						card.state.faceUp = false;
+						notifyDraftEffectUse();
+						card.state.cardName = cardNames;
+						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
+					});
+					break;
+				}
 				default:
 					return reportError(`Unimplemented draft effect: ${draftEffect.effect}.`);
 			}
@@ -2494,57 +2515,49 @@ export class Session implements IIndexable {
 				}
 				case OptionalOnPickDraftEffect.IllicitMarkets: {
 					const index = booster.findIndex((c) => c.uniqueID === optionalOnPickDraftEffect.cardID);
-					if (index < 0 || !hasEffect(booster[index], OptionalOnPickDraftEffect.IllicitMarkets))
-						return reportError("Invalid draft effect card.");
+					if (index < 0) return reportError("Invalid draft effect card.");
 					if (!pickedCards.includes(index))
 						return reportError("You must pick Illicit Markets to use its effect.");
+					if (!hasEffect(booster[index], OptionalOnPickDraftEffect.IllicitMarkets))
+						return reportError("Invalid draft effect card.");
+
+					if (pickedCards.length !== picksThisRound + 2) return reportError("Missing Illicit Markets picks.");
+
 					const card = booster[index];
 
-					const illicitMarketPick = async (
-						sourceCard: UniqueCard,
-						packCards: UniqueCard[],
-						poolCards: UniqueCard[]
-					): Promise<{
-						packCardIDs: [UniqueCardID, UniqueCardID];
-						poolCardIDs: [UniqueCardID, UniqueCardID];
-					} | null> => {
-						if (!Connections[userID]?.socket) return null;
-
-						return await new Promise((resolve) => {
-							Connections[userID].socket.timeout(60 * 1000).emit(
-								"illicitMarketsPick",
-								{
-									sourceCard,
-									packCards,
-									poolCards,
-								},
-								(
-									err: Error | null,
-									response?: {
-										packCardIDs: [UniqueCardID, UniqueCardID];
-										poolCardIDs: [UniqueCardID, UniqueCardID];
-									} | null
-								) => {
-									if (err || !response) {
-										resolve(null);
-										return;
-									}
-									resolve(response);
-								}
-							);
-						});
-					};
-
-					if (!s.players[userID].effect) s.players[userID].effect = {};
-					const availablePackCards = booster.filter((_, idx) => !pickedCards.includes(idx));
-					let cardPool = booster;
 					if (s.players[userID].isBot) return reportError("Bots cannot use Illicit Markets.");
-					else cardPool = Connections[userID].pickedCards.main.concat(Connections[userID].pickedCards.side);
-					cardPool = cardPool.filter((card) => !card.state?.faceUp);
-					const result = await illicitMarketPick(card, availablePackCards, cardPool);
+
+					const result = await new Promise<{
+						err: "short" | null;
+						cards: UniqueCardID[];
+					} | null>((resolve) => {
+						Connections[userID].socket.timeout(60 * 1000).emit(
+							"pickPoolCards",
+							{
+								count: 2,
+								title: "Illicit Markets",
+								message: "Choose 2 face-down cards from your pool to return.",
+							},
+							(
+								err: Error | null,
+								response: {
+									err: "short" | null;
+									cards: UniqueCardID[];
+								} | null
+							) => {
+								if (err || !response) {
+									resolve(null);
+									return;
+								}
+								resolve(response);
+							}
+						);
+					});
+
 					if (!result) return reportError("Failed to retrieve choices for Illicit Markets.");
-					const newCards: [UniqueCardID, UniqueCardID] = result.packCardIDs;
-					const retCards = result.poolCardIDs;
+
+					if (result.err === "short" || result.cards.length !== 2)
+						return reportError("Illicit Markets requires 2 face-down cards in your pool.");
 
 					const FindInPoolByUniqueID = (uid: UniqueCardID): UniqueCard | null => {
 						const main = Connections[userID].pickedCards.main;
@@ -2558,21 +2571,21 @@ export class Session implements IIndexable {
 						return null;
 					};
 
-					const card1 = FindInPoolByUniqueID(retCards[0]);
-					const card2 = FindInPoolByUniqueID(retCards[1]);
-					const selectedPackCards = newCards
-						.map((uid) => booster.findIndex((c) => c.uniqueID === uid))
-						.filter((idx) => idx >= 0);
-					if (!card1 || !card2 || !selectedPackCards || selectedPackCards.length != 2)
-						return reportError("Failed to select cards for 'Illicit Markets.'");
+					const card1 = FindInPoolByUniqueID(result.cards[0]);
+					const card2 = FindInPoolByUniqueID(result.cards[1]);
 
-					applyDraftEffects.push(async () => {
+					if (!card1 || !card2) return reportError("Failed to select cards for 'Illicit Markets.'");
+
+					picksThisRound += 1;
+
+					const pickedPos = pickedCards.indexOf(index);
+					if (pickedPos >= 0) pickedCards.splice(pickedPos, 1);
+
+					applyDraftEffects.push(() => {
 						if (!card.state) card.state = {};
 						if (!card.state.count) card.state.count = 0;
 						card.state.count += 1;
 						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
-
-						picksThisRound += 1;
 
 						const RemoveFromPoolByUniqueID = (uid: UniqueCardID): UniqueCard | null => {
 							const main = Connections[userID].pickedCards.main;
@@ -2585,19 +2598,18 @@ export class Session implements IIndexable {
 
 							return null;
 						};
+
 						RevealEffects(card1);
 						RevealEffects(card2);
-						RemoveFromPoolByUniqueID(retCards[0]);
-						RemoveFromPoolByUniqueID(retCards[1]);
-						const pickedPos = pickedCards.indexOf(index);
-						if (pickedPos >= 0) pickedCards.splice(pickedPos, 1);
 
-						pickedCards.push(selectedPackCards[0], selectedPackCards[1]);
+						RemoveFromPoolByUniqueID(result.cards[0]);
+						RemoveFromPoolByUniqueID(result.cards[1]);
+
 						notify(
 							`${Connections[userID].userName} used the effect of 'Illicit Markets,' returning '${card1.name}' and '${card2.name}'.`
 						);
-						return;
 					});
+
 					break;
 				}
 			}
@@ -2716,6 +2728,42 @@ export class Session implements IIndexable {
 			s.players[userID].effect!.aetherSearcher = undefined;
 			noteCardRiders(booster[pickedCards[0]]);
 		}
+		if (s.players[userID].effect?.makeshiftConfiguration) {
+			const target = s.players[userID].effect!.makeshiftConfiguration!.card;
+			if (!target.state) target.state = {};
+
+			for (const card of pickedCards.map((idx) => booster[idx])) {
+				if (target.state.manaValue == undefined) {
+					target.state.manaValue = (card.mana_cost ?? 0) == "" ? 0 : (card.mana_cost ?? 0);
+					const msg = new ToastMessage(
+						`${Connections[userID].userName} picked '${card.name}' and noted its manavalue ('${target.state.manaValue}') on their '${target.name}'!`
+					);
+					this.emitToConnectedUsers("message", msg);
+					noteCardRiders(card);
+				} else if (target.state.power == undefined) {
+					target.state.power = (card.power ?? 0) == "" ? 0 : (card.power ?? 0);
+					const msg = new ToastMessage(
+						`${Connections[userID].userName} picked '${card.name}' and noted its power ('${target.state.power}') on their '${target.name}'!`
+					);
+					this.emitToConnectedUsers("message", msg);
+					noteCardRiders(card);
+				} else if (target.state.toughness == undefined) {
+					target.state.toughness = (card.toughness ?? 0) == "" ? 0 : (card.toughness ?? 0);
+					const msg = new ToastMessage(
+						`${Connections[userID].userName} picked '${card.name}' and noted its toughness ('${target.state.toughness}') on their '${target.name}'!`
+					);
+					this.emitToConnectedUsers("message", msg);
+					noteCardRiders(card);
+					s.players[userID].effect!.makeshiftConfiguration = undefined;
+					break;
+				} else {
+					s.players[userID].effect!.makeshiftConfiguration = undefined;
+					break;
+				}
+			}
+			updatedCardStates.push({ cardID: target.uniqueID, state: target.state });
+			console.log(target.state);
+		}
 
 		for (const card of pickedCards.map((idx) => booster[idx])) {
 			if (card.draft_effects) {
@@ -2766,24 +2814,26 @@ export class Session implements IIndexable {
 
 								return await new Promise<PoolEntry>((resolve) => {
 									Connections[targetID].socket.timeout(60 * 1000).emit(
-										"chaoticWrapperPick",
+										"pickPoolCards",
 										{
-											wrappingPlayer: {
-												userID,
-												userName: Connections[userID]?.userName ?? userID,
-											},
-											sourceCard: card,
-											cards: pool.map((entry) => entry.card),
+											count: 1,
+											message: "Choose a face-down card to have Chaotic Wrapper wrap",
+											title: "Chaotic Wrapper",
 										},
-										(err: Error | null, selectedCardID?: UniqueCardID | null) => {
-											if (err || !selectedCardID) {
+										(err: Error, result: { cards: UniqueCardID[] } | null) => {
+											if (err || !result || !result.cards || result.cards.length != 1) {
 												resolve(fallback());
 												return;
 											}
 
 											const selected = pool.find(
-												(entry) => entry.card.uniqueID === selectedCardID
+												(entry) => entry.card.uniqueID === result.cards[0]
 											);
+											if (!selected || selected.card.state?.faceUp == true) {
+												resolve(fallback());
+												return;
+											}
+
 											resolve(selected ?? fallback());
 										}
 									);
@@ -2866,6 +2916,11 @@ export class Session implements IIndexable {
 						case OnPickDraftEffect.AetherSearcher: {
 							if (!s.players[userID].effect) s.players[userID].effect = {};
 							s.players[userID].effect!.aetherSearcher = { card: card };
+							break;
+						}
+						case OnPickDraftEffect.MakeshiftConfiguration: {
+							if (!s.players[userID].effect) s.players[userID].effect = {};
+							s.players[userID].effect!.makeshiftConfiguration = { card: card };
 							break;
 						}
 						case OnPickDraftEffect.ArchdemonOfPaliano: {
@@ -3044,7 +3099,16 @@ export class Session implements IIndexable {
 
 			const { picksThisRound, burnsThisRound } = s.picksAndBurnsThisRound(userID);
 
-			const booster = s.players[userID].boosters[0];
+			const booster = s.players[userID].boosters[0].filter(
+				(card) =>
+					!hasEffect(card, ParameterizedDraftEffectType.CantPick) ||
+					card.draft_effects?.some(
+						(effect) =>
+							effect.type == ParameterizedDraftEffectType.CantPick &&
+							((isArray(effect.pick) && effect.pick.includes(s.players[userID].totalPickNumber + 1)) ||
+								effect.pick == s.players[userID].totalPickNumber + 1)
+					)
+			);
 			// Avoid using bots if it is not necessary: We're picking the whole pack.
 			if (picksThisRound >= booster.length) {
 				for (let i = 0; i < booster.length; i++) {
@@ -3096,6 +3160,11 @@ export class Session implements IIndexable {
 		++s.players[userID].pickNumber;
 		++s.players[userID].totalPickNumber;
 
+		for (const card of pickedIndices.map((idx) => booster[idx]))
+			if (card.draft_effects?.find((e) => e.type === OnPickDraftEffect.FaceUp)) {
+				if (!card.state) card.state = {};
+				card.state.faceUp = true;
+			}
 		// We're actually picking on behalf of a disconnected player
 		if (!s.players[userID].isBot && this.isDisconnected(userID))
 			this.disconnectedUsers[userID].pickedCards.main.push(...pickedIndices.map((idx) => booster[idx]));

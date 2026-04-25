@@ -455,6 +455,13 @@ export default defineComponent({
 			selectedOptionalDraftPickEffect: undefined as
 				| undefined
 				| { name: string; effect: OptionalOnPickDraftEffect; cardID: UniqueCardID },
+			poolPickRequest: null as null | {
+				count: number;
+				title: string;
+				message: string;
+				callback: ((result: { err: "short" | null; cards: UniqueCardID[] } | null) => void) | null;
+				selected: UniqueCardID[];
+			},
 			// Brewing (deck and sideboard should not be modified directly, have to
 			// stay in sync with their CardPool display)
 			deck: [] as UniqueCard[],
@@ -484,6 +491,38 @@ export default defineComponent({
 		};
 	},
 	methods: {
+		submitPoolPick() {
+			if (!this.poolPickRequest) return;
+			if (this.poolPickRequest.selected.length !== this.poolPickRequest.count) return;
+
+			this.poolPickRequest.callback?.({
+				err: null,
+				cards: [...this.poolPickRequest.selected],
+			});
+			this.poolPickRequest = null;
+		},
+
+		cancelPoolPick() {
+			if (!this.poolPickRequest) return;
+
+			this.poolPickRequest.callback?.(null);
+			this.poolPickRequest = null;
+		},
+
+		togglePoolPickCard(card: UniqueCard) {
+			if (!this.poolPickRequest) return;
+			if (card.state?.faceUp) return;
+
+			const idx = this.poolPickRequest.selected.indexOf(card.uniqueID);
+			if (idx >= 0) {
+				this.poolPickRequest.selected.splice(idx, 1);
+				return;
+			}
+
+			if (this.poolPickRequest.selected.length >= this.poolPickRequest.count) return;
+			this.poolPickRequest.selected.push(card.uniqueID);
+		},
+
 		initializeSocket() {
 			this.socket.on("disconnect", () => {
 				console.log("Disconnected from server.");
@@ -497,122 +536,40 @@ export default defineComponent({
 					});
 			});
 
-			this.socket.on("illicitMarketsPick", async (data, callback) => {
-				if (data.packCards.length < 2 || data.poolCards.length < 2) {
+			this.socket.on("pickPoolCards", async (data, callback) => {
+				// Validate input
+				if (!data || typeof data.count !== "number" || data.count <= 0) {
 					callback(null);
 					return;
 				}
 
-				const getCardLabel = (card: UniqueCard) =>
-					this.language in card.printed_names ? card.printed_names[this.language] : card.name;
+				// Get player's pool (same pattern you've used elsewhere)
+				const pool = (this.deck ?? []).concat(this.sideboard ?? []);
 
-				const makeCheckboxList = (cards: UniqueCard[], groupName: string) =>
-					cards
-						.map(
-							(card) => `
-					<label style="display:block; text-align:left; margin:0.35em 0;">
-					<input type="checkbox" name="${groupName}" value="${card.uniqueID}">
-					${getCardLabel(card)}
-					</label>
-					`
-						)
-						.join("");
+				// Filter out invalid selections (e.g., face-up if needed)
+				const selectable = pool.filter((card) => !card.state?.faceUp);
 
-				const pickExactlyTwo = async (
-					title: string,
-					text: string,
-					cards: UniqueCard[],
-					groupName: string
-				): Promise<[UniqueCardID, UniqueCardID] | null> => {
-					const result = await Alert.fire({
-						title,
-						text,
-						html: `<div style="max-height: 18rem; overflow-y: auto;">${makeCheckboxList(cards, groupName)}</div>`,
-						showCancelButton: true,
-						confirmButtonText: "Confirm",
-						cancelButtonText: "Cancel",
-						allowOutsideClick: false,
-						focusConfirm: false,
-						preConfirm: () => {
-							const checked = Array.from(
-								document.querySelectorAll(`input[name="${groupName}"]:checked`)
-							) as HTMLInputElement[];
-
-							if (checked.length !== 2) {
-								Swal.showValidationMessage("Choose exactly 2 cards.");
-								return null;
-							}
-
-							return checked.map((input) => Number(input.value)) as [UniqueCardID, UniqueCardID];
-						},
+				if (selectable.length < data.count) {
+					callback({
+						err: "short",
+						cards: selectable.map((card) => card.uniqueID),
 					});
+					return;
+				} else if (selectable.length == data.count) {
+					callback({
+						err: null,
+						cards: selectable.map((card) => card.uniqueID),
+					});
+					return;
+				}
 
-					if (!result.isConfirmed || !result.value) return null;
-					return result.value;
+				this.poolPickRequest = {
+					count: data.count,
+					title: data.title,
+					message: data.message,
+					callback: callback,
+					selected: [],
 				};
-
-				const packCardIDs = await pickExactlyTwo(
-					"Illicit Markets",
-					"Choose 2 unchosen cards from the pack.",
-					data.packCards,
-					"illicit-pack"
-				);
-				if (!packCardIDs) {
-					callback(null);
-					return;
-				}
-
-				const poolCardIDs = await pickExactlyTwo(
-					"Illicit Markets",
-					"Choose 2 face-down cards from your card pool to return.",
-					data.poolCards,
-					"illicit-pool"
-				);
-				if (!poolCardIDs) {
-					callback(null);
-					return;
-				}
-
-				callback({
-					packCardIDs,
-					poolCardIDs,
-				});
-			});
-
-			this.socket.on("chaoticWrapperPick", async (data, callback) => {
-				if (
-					!data.cards ||
-					data.cards.length === 0 ||
-					data.cards.filter((card) => !(card.state?.faceUp ?? 0)).length === 0
-				) {
-					callback(null);
-					return;
-				}
-
-				const inputOptions: Record<string, string> = {};
-				for (const card of data.cards.filter((card) => !(card.state?.faceUp ?? 0))) {
-					inputOptions[String(card.uniqueID)] =
-						this.language in card.printed_names ? card.printed_names[this.language] : card.name;
-				}
-
-				const result = await Alert.fire({
-					title: `${data.wrappingPlayer.userName} picked ${data.sourceCard.name}`,
-					text: "Choose a card to put into the wrapped pack.",
-					input: "select",
-					inputOptions,
-					inputPlaceholder: "Select a card",
-					showCancelButton: true,
-					confirmButtonText: "Choose",
-					cancelButtonText: "Cancel",
-					allowOutsideClick: false,
-				});
-
-				if (!result.isConfirmed || !result.value) {
-					callback(null);
-					return;
-				}
-
-				callback(Number(result.value));
 			});
 
 			this.socket.io.on("reconnect", (attemptNumber) => {
@@ -3471,6 +3428,10 @@ export default defineComponent({
 			}
 		},
 		deckToSideboard(e: Event, c: UniqueCard) {
+			if (this.poolPickRequest) {
+				this.togglePoolPickCard(c);
+				return;
+			}
 			// From deck to sideboard
 			const idx = this.deck.indexOf(c);
 			if (idx >= 0) {
@@ -3484,6 +3445,10 @@ export default defineComponent({
 			}
 		},
 		sideboardToDeck(e: Event, c: UniqueCard) {
+			if (this.poolPickRequest) {
+				this.togglePoolPickCard(c);
+				return;
+			}
 			// From sideboard to deck
 			const idx = this.sideboard.indexOf(c);
 			if (idx >= 0) {

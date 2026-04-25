@@ -78,9 +78,21 @@ const notes = computed(() => {
 			return props.card.state.cardsDraftedThisRound.toString();
 		if (hasEffect(props.card, OnPickDraftEffect.NotePassingPlayer) && props.card.state.passingPlayer)
 			return props.card.state.passingPlayer;
-		if (props.card.state.cardName) return props.card.state.cardName;
+		if (props.card.state.cardName) {
+			if (Array.isArray(props.card.state.cardName))
+				return props.card.state.cardName.filter((name) => name && name.trim().length > 0);
+			return props.card.state.cardName;
+		}
 		if (props.card.state.creatureName) return props.card.state.creatureName;
 		if (props.card.state.creatureTypes) return props.card.state.creatureTypes;
+		if (props.card.state.toughness)
+			return [
+				`Mv '${props.card.state.manaValue}'`,
+				`P '${props.card.state.power}'`,
+				`T '${props.card.state.toughness}'`,
+			];
+		if (props.card.state.power) return [`Mv '${props.card.state.manaValue}'`, `P '${props.card.state.power}'`];
+		if (props.card.state.manaValue) return [`Mv '${props.card.state.manaValue}'`];
 	}
 	return undefined;
 });

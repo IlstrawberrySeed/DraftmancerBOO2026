@@ -276,24 +276,16 @@ export interface ServerToClientEvents {
 
 	takeoverVote: (userName: string, callback: (response: boolean | null) => void) => void;
 
-	chaoticWrapperPick: (
+	pickPoolCards: (
 		data: {
-			wrappingPlayer: { userID: UserID; userName: string };
-			sourceCard: UniqueCard;
-			cards: UniqueCard[];
-		},
-		callback: (selectedCardID: UniqueCardID | null) => void
-	) => void;
-	illicitMarketsPick: (
-		data: {
-			sourceCard: UniqueCard;
-			packCards: UniqueCard[];
-			poolCards: UniqueCard[];
+			count: number;
+			message: string;
+			title: string;
 		},
 		callback: (
 			result: {
-				packCardIDs: [UniqueCardID, UniqueCardID];
-				poolCardIDs: [UniqueCardID, UniqueCardID];
+				err: "short" | null;
+				cards: UniqueCardID[];
 			} | null
 		) => void
 	) => void;

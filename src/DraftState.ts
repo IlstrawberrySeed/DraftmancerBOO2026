@@ -37,6 +37,7 @@ export class DraftState extends IDraftState {
 				aetherSearcher?: { card: UniqueCard };
 				extraPicks?: number;
 				nextExtraPicks?: number;
+				makeshiftConfiguration?: { card: UniqueCard };
 			};
 		};
 	} = {};

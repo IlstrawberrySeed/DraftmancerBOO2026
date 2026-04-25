@@ -749,22 +749,46 @@
 							<div id="booster-controls" class="section-title">
 								<h2>Your Booster ({{ draftState.booster.length }})</h2>
 								<div class="controls" style="flex-grow: 2">
-									<span
-										>Pack #{{ draftState.boosterNumber + 1 }}, Pick #{{
-											draftState.pickNumber + 1
-										}}</span
-									>
-									<span v-show="pickTimer >= 0" :class="{ redbg: pickTimer <= 10 }" id="chrono">
-										<div
-											class="timer-icon"
-											:key="`${maxTimer}_${draftState.boosterNumber}_${draftState.pickNumber}`"
-											:style="`--timer-max: ${maxTimer}; --timer-current: ${pickTimer - 1}`"
+									<div v-if="poolPickRequest" class="pool-pick-banner">
+										<h3>{{ poolPickRequest.title }}</h3>
+										<p>{{ poolPickRequest.message }}</p>
+										<p>
+											{{ poolPickRequest.selected.length }} / {{ poolPickRequest.count }} selected
+										</p>
+										<input
+											type="button"
+											@click="submitPoolPick()"
+											value="Confirm Pick"
+											v-if="poolPickRequest.selected.length === poolPickRequest.count"
+										/>
+										<span v-else>
+											<span v-if="poolPickRequest.count === 1">Pick a card from your pool</span>
+											<span v-else>
+												Pick {{ poolPickRequest.count }} cards from your pool ({{
+													poolPickRequest.selected.length
+												}}/{{ poolPickRequest.count }})
+											</span>
+										</span>
+										<button @click="cancelPoolPick">Cancel</button>
+									</div>
+									<template v-else>
+										<span
+											>Pack #{{ draftState.boosterNumber + 1 }}, Pick #{{
+												draftState.pickNumber + 1
+											}}</span
 										>
-											<font-awesome-icon icon="fa-solid fa-stopwatch" size="lg" />
-											<div class="timer-icon-moving"></div>
-										</div>
-										<span>{{ pickTimer }}</span>
-									</span>
+										<span v-show="pickTimer >= 0" :class="{ redbg: pickTimer <= 10 }" id="chrono">
+											<div
+												class="timer-icon"
+												:key="`${maxTimer}_${draftState.boosterNumber}_${draftState.pickNumber}`"
+												:style="`--timer-max: ${maxTimer}; --timer-current: ${pickTimer - 1}`"
+											>
+												<font-awesome-icon icon="fa-solid fa-stopwatch" size="lg" />
+												<div class="timer-icon-moving"></div>
+											</div>
+											<span>{{ pickTimer }}</span>
+										</span>
+									</template>
 									<template v-if="gameState == GameState.Picking">
 										<template v-if="draftState.skipPick">
 											<button @click="passBooster">Pass Booster</button>
@@ -1520,6 +1544,11 @@
 									<template #item="{ element }">
 										<card
 											:card="element"
+											:class="{
+												'pool-pick-selected': poolPickRequest?.selected.includes(
+													element.uniqueID
+												),
+											}"
 											:language="language"
 											@click.exact="sideboardToDeck($event, element)"
 											:conditionalClasses="cardConditionalClasses"
