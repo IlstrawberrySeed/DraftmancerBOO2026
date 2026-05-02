@@ -6,7 +6,7 @@ Join the discord for development related discussions: https://discord.gg/XscXXNw
 
 ## How to run the project locally
 
--   Clone repository (`git clone https://github.com/Senryoku/Draftmancer.git`)
+-   Clone repository (`git clone https://github.com/IlstrawberrySeed/DraftmancerBOO2026.git`)
 -   Open repository (`cd Draftmancer`)
 -   Execute `npm install` to install dependencies.
 -   Execute `npm run build` to build the server using typescript and the client using webpack (for production).
