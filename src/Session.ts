@@ -2148,6 +2148,8 @@ export class Session implements IIndexable {
 						return card.colors?.includes(atom.value);
 					case QualityKind.Supertype:
 						return card.type?.toLowerCase().includes(atom.value.toLowerCase());
+					case QualityKind.ManaValue:
+						return parseManaValue(card.mana_cost) == atom.value;
 					default:
 						return false;
 				}

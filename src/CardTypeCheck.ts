@@ -85,6 +85,8 @@ export function isQualityAtom(obj: unknown): obj is QualityAtom {
 			return hasProperty("value", isSomeEnum(CardColor))(obj);
 		case QualityKind.Supertype:
 			return hasProperty("value", isString)(obj);
+		case QualityKind.ManaValue:
+			return hasProperty("value", isNumber)(obj);
 		default:
 			return false;
 	}

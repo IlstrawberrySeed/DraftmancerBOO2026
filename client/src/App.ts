@@ -4132,7 +4132,8 @@ export default defineComponent({
 									UsableDraftEffect.NoteCreatureTypes,
 									UsableDraftEffect.AgentOfAcquisitions,
 									UsableDraftEffect.LeovoldsOperative,
-									UsableDraftEffect.LeovoldsOperative,
+									UsableDraftEffect.NoteUndraftedNames,
+									UsableDraftEffect.DiscerningHoarder,
 								].includes(effect.type as UsableDraftEffect)) ||
 							// Disallow Cogwork Librarian effect if there's not enough cards in the pack.
 							(effect.type === UsableDraftEffect.CogworkLibrarian &&

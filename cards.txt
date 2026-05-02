@@ -440,6 +440,43 @@
 		"mana_cost": "",
 		"type": "",
 		"draft_effects": ["IgnoreCard"]
+	},
+	{	
+		"name": "Landscape Vault",
+		"mana_cost": "",
+		"type": "Land",
+		#image,
+		"colors": [],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "AssociateNotedCards",
+			{	"type": "NoteQualityName",
+				"qualities":
+				[	[	{"kind": "Type", "value": "Artifact"},
+						{"kind": "Type", "value": "Battle"},
+						{"kind": "Type", "value": "Creature"},
+						{"kind": "Type", "value": "Enchantment"},
+						{"kind": "Type", "value": "Land"},
+						{"kind": "Type", "value": "Planeswalker"}
+					],
+					[	{"kind": "ManaValue", "value": 0},
+						{"kind": "ManaValue", "value": 1},
+						{"kind": "ManaValue", "value": 2},
+						{"kind": "ManaValue", "value": 3}
+					]
+				]
+			}],
+		#"oracle_text": ,
+		"power": "0",
+		"toughness": "3"
+		#"loyalty": 
 	}
 ]
 
@@ -462,4 +499,4 @@
 2 Mystical Menagerie
 2 Grasping Ephemeration
 38 Llanowar Elves
-90 Wheel of Fortune
+90 Landscape Vault

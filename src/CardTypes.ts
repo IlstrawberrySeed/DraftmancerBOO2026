@@ -98,7 +98,8 @@ export type QualityAtom =
 	| { kind: "Type"; value: string }
 	| { kind: "Subtype"; value: string }
 	| { kind: "Color"; value: CardColor }
-	| { kind: "Supertype"; value: string };
+	| { kind: "Supertype"; value: string }
+	| { kind: "ManaValue"; value: number };
 
 export enum QualityKind {
 	Rarity = "Rarity",
@@ -106,6 +107,7 @@ export enum QualityKind {
 	Subtype = "Subtype",
 	Color = "Color",
 	Supertype = "Supertype",
+	ManaValue = "ManaValue",
 }
 
 export type CardFace = {
