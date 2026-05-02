@@ -102,7 +102,7 @@
 		"rating": 2,
 		#"layout": ,
 		#"back": ,
-		"related_cards": ["Murder"],
+		"related_cards": ["Murder (pM19) 110"],
 		"draft_effects": ["FaceUp", "NoteCardName", "NoteFaceUp", {"type": "ReplaceNotedCard", "count": 1, "cards": ["Murder (pM19) 110"]}],
 		#"oracle_text": ,
 		"power": 2,
@@ -166,7 +166,7 @@
 			#"layout": 
 		},
 		#"related_cards": ,
-		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "NoteFaceUp", { "type": "NoteQualityName", 
+		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "AssociateNotedCards", "CopyNotedDraftEffects", { "type": "NoteQualityName", 
 				"qualities": [
 					[ { "kind": "Color", "value": "G" }, ], 
 					[ { "kind": "Type", "value": "Creature" }, ]
@@ -189,22 +189,23 @@
 			"Lesson",
 		],
 		"rating": 4,
-		"layout": "split-left",
-		"back": {
-			"name": "",
-			#"image": ,
-			"type": "Sorcery",
-			"subtypes": [
-			],
-			"mana_cost": "{U}",
-			#"oracle_text": ,
-			#"power": 6,
-			#"toughness": 5
-			#"loyaly": ,
-			"layout": "split-left"
-		},
+		#"layout": "split-left",
+		#"back": {
+		#	"name": "",
+		#	#"image": ,
+		#	"type": "Sorcery",
+		#	"subtypes": [
+		#	],
+		#	"mana_cost": "{U}",
+		#	#"oracle_text": ,
+		#	#"power": 6,
+		#	#"toughness": 5
+		#	#"loyaly": ,
+		#	"layout": "split-left"
+		#},
 		#"related_cards": ,
-		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "NoteFaceUp", { "type": "NoteQualityName", "qualities": [ [ { "kind": "Type", "value": "Sorcery" }, ] ] }]
+		"draft_effects": ["FaceUp", "NoteCardName", "RemoveNotedCard", "AssociateNotedCards", "CopyNotedDraftEffects", { "type": "NoteQualityName", "qualities": [ [ { "kind": "Type", "value": "Sorcery" }, ] ] }]
+
 		#"oracle_text": ,
 		#"power": 3,
 		#"toughness": 3
@@ -263,7 +264,7 @@
 	},
 	{	
 		"name": "Pheldagrif's Assistance",
-		"mana_cost": "",
+		"mana_cost": "{W}{B}{G}",
 		"type": "Kindred",
 		#image,
 		"colors": ["W", "B", "G"],
@@ -363,11 +364,82 @@
 		#"layout": ,
 		#"back": ,
 		#"related_cards": ,
-		"draft_effects": ["FaceUp", "NoteUndraftedNames"],
+		"draft_effects": ["FaceUp", "MakeshiftConfiguration"],
 		#"oracle_text": ,
 		"power": "Y",
 		"toughness": "Z"
 		#"loyalty": 
+	},
+	{	
+		"name": "Scrapyard Bartender",
+		"mana_cost": "{4}",
+		"type": "Artifact Creature",
+		#image,
+		"colors": [],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+			"Shapeshifter"
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["Reveal", "ScrapyardBartender"],
+		#"oracle_text": ,
+		"power": "3",
+		"toughness": "3"
+		#"loyalty": 
+	},
+	{	
+		"name": "Mystical Menagerie",
+		"mana_cost": "{2}{W}{W}",
+		"type": "Enchantment",
+		#image,
+		"colors": ["W"],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["FaceUp", "MysticalMenagerie"]
+		#"oracle_text": ,
+		#"power": "3",
+		#"toughness": "3"
+		#"loyalty": 
+	},
+	{	
+		"name": "Grasping Ephemeration",
+		"mana_cost": "{5}",
+		"type": "Creature",
+		#image,
+		"colors": [],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+			"Illusion",
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["Reveal", "GraspingEphemeration"],
+		#"oracle_text": ,
+		"power": "0",
+		"toughness": "3"
+		#"loyalty": 
+	},
+	{	
+		"name": "Dummy Card",
+		"mana_cost": "",
+		"type": "",
+		"draft_effects": ["IgnoreCard"]
 	}
 ]
 
@@ -377,15 +449,17 @@
 1 Courtier's Gambit
 1 Shambling Corpse
 1 Guild Master Facade 
-2 _
-2 Naritive Fracture
+32 _
+92 Naritive Fracture
 1 Dungeon Delve
 2 Illicit Markets
 1 Pheldagrif's Assistance
 1 Super Chaos Warp
 1 Sage of Thermodynamics
-1 Super Booster Tutor
-90 Makeshift Configuration
-72 Mountain
+91 Super Booster Tutor
+1 Makeshift Configuration
+1 Scrapyard Bartender 
+2 Mystical Menagerie
+2 Grasping Ephemeration
+38 Llanowar Elves
 90 Wheel of Fortune
-90 Dryad Arbor 

@@ -23,6 +23,10 @@ export enum OnPickDraftEffect {
 	ArchdemonOfPaliano = "ArchdemonOfPaliano",
 	ChaoticWrapper = "ChaoticWrapper",
 	MakeshiftConfiguration = "MakeshiftConfiguration",
+	ScrapyardBartender = "ScrapyardBartender",
+	MysticalMenagerie = "MysticalMenagerie",
+	GraspingEphemeration = "GraspingEphemeration",
+	IgnoreCard = "IgnoreCard",
 }
 
 // Same thing, but a may ability.
@@ -53,7 +57,9 @@ export type SimpleDraftEffectType =
 	| "TrackRemovedCardsSubtypes"
 	| "CogworkGrinder"
 	| "RemoveNotedCard"
-	| "NoteFaceUp";
+	| "NoteFaceUp"
+	| "CopyNotedDraftEffects"
+	| "AssociateNotedCards";
 
 export enum ParameterizedDraftEffectType {
 	AddCards = "AddCards",
@@ -181,6 +187,7 @@ export type UniqueCardState = {
 	manaValue?: number | string;
 	power?: number | string;
 	toughness?: number | string;
+	messages?: string[];
 };
 
 export class UniqueCard extends Card {

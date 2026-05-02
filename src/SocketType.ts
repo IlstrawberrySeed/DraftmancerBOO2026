@@ -276,6 +276,34 @@ export interface ServerToClientEvents {
 
 	takeoverVote: (userName: string, callback: (response: boolean | null) => void) => void;
 
+	pickNumber: (
+		data: {
+			title: string;
+			message: string;
+			defaultValue?: number;
+			min?: number;
+			max?: number;
+		},
+		callback: (result: { value: number } | null) => void
+	) => void;
+
+	pickEphemerationPlayer: (
+		data: {
+			title: string;
+			message: string;
+			choices: {
+				userID: UserID;
+				userName: string;
+				cardName: string;
+			}[];
+		},
+		callback: (
+			result: {
+				userID: UserID;
+			} | null
+		) => void
+	) => void;
+
 	pickPoolCards: (
 		data: {
 			count: number;

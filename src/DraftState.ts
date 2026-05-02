@@ -38,11 +38,23 @@ export class DraftState extends IDraftState {
 				extraPicks?: number;
 				nextExtraPicks?: number;
 				makeshiftConfiguration?: { card: UniqueCard };
+				tab?: number;
+				mysticalMenagerie?: number;
 			};
 		};
 	} = {};
 
 	pendingTimeout: NodeJS.Timeout | null = null;
+
+	//Put in Draftstate so all players go to the same source of truth. Not sure this is the best spot though.
+	draft_effects?: {
+		tabValues?: number[];
+		graspingEphemeration?: {
+			ownerID: UserID;
+			card: UniqueCard;
+			players: { [userID: UserID]: { card: UniqueCard } };
+		}[];
+	};
 
 	constructor(
 		boosters: UniqueCard[][],

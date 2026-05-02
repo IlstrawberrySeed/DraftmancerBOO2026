@@ -94,6 +94,7 @@ const notes = computed(() => {
 		if (props.card.state.power) return [`Mv '${props.card.state.manaValue}'`, `P '${props.card.state.power}'`];
 		if (props.card.state.manaValue) return [`Mv '${props.card.state.manaValue}'`];
 	}
+	if (props.card.state.messages) return props.card.state.messages;
 	return undefined;
 });
 

@@ -3,6 +3,7 @@ import axios, { AxiosError } from "axios";
 
 import { arrayIntersect, random } from "./utils.js";
 import { Card, OracleID } from "./CardTypes.js";
+import { isUniqueCard } from "./CardTypeCheck.js";
 import { isArrayOf, isNumber } from "./TypeChecks.js";
 
 import { MTGDraftBotParameters, RequestParameters } from "./bots/ExternalBotInterface.js";

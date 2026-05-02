@@ -536,6 +536,54 @@ export default defineComponent({
 					});
 			});
 
+			this.socket.on("pickNumber", async (data, callback) => {
+				const result = await Alert.fire({
+					title: data.title,
+					text: data.message,
+					input: "number",
+					inputValue: data.defaultValue?.toString() ?? "",
+					inputAttributes: {
+						...(data.min !== undefined ? { min: data.min.toString() } : {}),
+						...(data.max !== undefined ? { max: data.max.toString() } : {}),
+					},
+					showCancelButton: true,
+					confirmButtonText: "Confirm",
+					cancelButtonText: "Cancel",
+					allowOutsideClick: false,
+				});
+
+				if (!result.isConfirmed || result.value === undefined || result.value === null) {
+					callback(null);
+					return;
+				}
+
+				callback({ value: Number(result.value) });
+			});
+
+			this.socket.on("pickEphemerationPlayer", async (data, callback) => {
+				const result = await Alert.fire({
+					title: data.title,
+					text: data.message,
+					input: "select",
+					inputOptions: Object.fromEntries(
+						data.choices.map((choice) => [choice.userID, `${choice.userName}: ${choice.cardName}`])
+					),
+					showCancelButton: true,
+					confirmButtonText: "Choose",
+					cancelButtonText: "Cancel",
+					allowOutsideClick: false,
+				});
+
+				if (!result.isConfirmed || !result.value) {
+					callback(null);
+					return;
+				}
+
+				callback({
+					userID: result.value as UserID,
+				});
+			});
+
 			this.socket.on("pickPoolCards", async (data, callback) => {
 				// Validate input
 				if (!data || typeof data.count !== "number" || data.count <= 0) {

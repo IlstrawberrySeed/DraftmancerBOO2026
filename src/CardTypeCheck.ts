@@ -44,6 +44,8 @@ export function isSimpleDraftEffectType(str: unknown): str is SimpleDraftEffectT
 				"CogworkGrinder",
 				"RemoveNotedCard",
 				"NoteFaceUp",
+				"CopyNotedDraftEffects",
+				"AssociateNotedCards",
 			].includes(str))
 	);
 }

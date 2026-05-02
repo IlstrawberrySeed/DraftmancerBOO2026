@@ -17,6 +17,7 @@ import {
 	QualityAtom,
 	QualityKind,
 } from "./CardTypes.js";
+import { isUniqueCard, isCard } from "./CardTypeCheck.js";
 import {
 	Cards,
 	getUnique,
@@ -83,7 +84,7 @@ import { parseLine } from "./parseCardList.js";
 import { WinchesterDraftState, isWinchesterDraftState } from "./WinchesterDraft.js";
 import { HousmanDraftState, isHousmanDraftState } from "./HousmanDraft.js";
 import { SolomonDraftState, isSolomonDraftState } from "./SolomonDraft.js";
-import { isSomeEnum, isArray, isNumber } from "./TypeChecks.js";
+import { isSomeEnum, isArray, isNumber, isArrayOf, isString } from "./TypeChecks.js";
 import { askColors, choosePlayer } from "./Conspiracy.js";
 import { InProduction, InTesting, TestingOnly } from "./Context.js";
 
@@ -2190,12 +2191,12 @@ export class Session implements IIndexable {
 			return;
 		};
 
-		const noteCardRiders = (card: Card) => {
+		const noteCardRiders = (card: UniqueCard) => {
 			const pickedCard = pickedCards[0];
 			if (hasEffect(card, "RemoveNotedCard") || hasEffect(card, ParameterizedDraftEffectType.ReplaceNotedCard)) {
+				pickedCards.shift();
 				burnsThisRound += 1;
 				picksThisRound -= 1;
-				pickedCards.shift();
 				if (pickedCard !== undefined) {
 					burnedCards.push(pickedCard);
 				}
@@ -2241,6 +2242,70 @@ export class Session implements IIndexable {
 				if (!booster[pickedCard].state) booster[pickedCard].state = {};
 				booster[pickedCard].state.faceUp = true;
 			} else RevealEffects(booster[pickedCards[0]]);
+
+			if (hasEffect(card, "CopyNotedDraftEffects") && booster[pickedCard].draft_effects) {
+				card.draft_effects = booster[pickedCard].draft_effects;
+				if (
+					hasEffect(card, OnPickDraftEffect.FaceUp) &&
+					hasEffect(booster[pickedCard], OnPickDraftEffect.FaceUp)
+				) {
+					if (!card.state) card.state = {};
+					card.state.faceUp = true;
+				} else if (hasEffect(booster[pickedCard], OnPickDraftEffect.Reveal)) {
+					picksThisRound++;
+					const dummy = getUnique("Dummy Card", { getCard: this.getCustomGetCardFunction() });
+					if (!dummy.draft_effects) dummy.draft_effects = [{ type: OnPickDraftEffect.IgnoreCard }];
+					dummy.draft_effects.concat(
+						booster[pickedCard].draft_effects.filter((ef) => ef.type != OnPickDraftEffect.Reveal)
+					);
+					pickedCards.push(booster.push(dummy));
+				}
+			}
+			if (hasEffect(card, "AssociateNotedCards")) {
+				if (!card.related_cards) card.related_cards = [];
+				const target = booster[pickedCard];
+
+				if (target.is_custom) {
+					card.related_cards.push({
+						name: target.name,
+						printed_names: target.printed_names,
+						image_uris: target.image_uris,
+						type: target.type,
+						subtypes: target.subtypes,
+						mana_cost: target.mana_cost,
+						oracle_text: target.oracle_text,
+						power: target.power,
+						toughness: target.toughness,
+						loyalty: target.loyalty,
+						layout: target.layout,
+					});
+				} else {
+					card.related_cards.push(target.id);
+				}
+			}
+		};
+		const parseManaValue = (manaValue?: number | string): number => {
+			/*r*/ if (!manaValue) return 0;
+			//else
+			/*r*/ if (isNumber(manaValue)) return manaValue;
+			//else
+			let out = 0;
+			const symbols = manaValue.split(/[{}]/).filter((c: string) => c !== "");
+			symbols.forEach((s) => {
+				if (Number(s)) out += Number(s);
+				else if (s.split(/[/\\|]/).filter((c: string) => c !== "").length > 1) {
+					let temp = 0;
+					// /|\ as seperators; variables; and phyrexian. Incidently removes pawprints, doesn't remove energy.
+					s.split(/[/\\|XYZxyzPHph]/)
+						.filter((c: string) => c !== "")
+						.forEach((s2) => {
+							if (Number(s2) && Number(s2) > temp) temp = Number(s2);
+							else if (temp == 0) temp = 1;
+						});
+					out += temp;
+				} else if (s.split(/[/\\|XYZxyzPHph]/).filter((c: string) => c !== "").length == 1) out++;
+			});
+			/*r*/ return out;
 		};
 
 		// Conspiracy draft matter cards
@@ -2398,8 +2463,8 @@ export class Session implements IIndexable {
 						card.state.faceUp = false;
 						notifyDraftEffectUse();
 						card.state.cardName = cardName;
-						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
 						noteCardRiders(card);
+						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
 					});
 					break;
 				}
@@ -2417,8 +2482,8 @@ export class Session implements IIndexable {
 						card.state.faceUp = false;
 						notifyDraftEffectUse();
 						card.state.creatureName = creatureName;
-						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
 						noteCardRiders(card);
+						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
 					});
 					break;
 				}
@@ -2438,8 +2503,8 @@ export class Session implements IIndexable {
 						card.state.faceUp = false;
 						notifyDraftEffectUse();
 						card.state.creatureTypes = creatureTypes;
-						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
 						noteCardRiders(card);
+						updatedCardStates.push({ cardID: card.uniqueID, state: card.state });
 					});
 					break;
 				}
@@ -2677,7 +2742,30 @@ export class Session implements IIndexable {
 
 		for (const effect of applyDraftEffects) effect();
 
-		for (const idx of pickedCards) {
+		for (const idx of pickedCards.filter((card) => !hasEffect(booster[card], OnPickDraftEffect.IgnoreCard))) {
+			if (s.draft_effects?.tabValues?.includes(parseManaValue(booster[idx].mana_cost))) {
+				if (!s.players[userID].effect) s.players[userID].effect = {};
+				if (!s.players[userID].effect.tab) s.players[userID].effect.tab = 0;
+				s.players[userID].effect.tab++;
+				RevealEffects(booster[idx]);
+				const msg = new ToastMessage(
+					`${Connections[userID].userName} picked '${booster[idx].name}' and increased their tab to '${s.players[userID].effect.tab}'!`
+				);
+				this.emitToConnectedUsers("message", msg);
+			}
+			if (
+				booster[idx].type.split(" ").includes("Creature") &&
+				s.players[userID].effect?.mysticalMenagerie &&
+				![...Connections[userID].pickedCards.main, ...Connections[userID].pickedCards.side].some((card) =>
+					card.subtypes?.some((type) => booster[idx].subtypes?.includes(type))
+				)
+			) {
+				if (!booster[idx].state) booster[idx].state = {};
+				if (!booster[idx].state.messages) booster[idx].state.messages = [];
+				for (let ii = 0; ii < s.players[userID].effect.mysticalMenagerie; ++ii)
+					booster[idx].state.messages.push("This spell purpetually costs 1 less to cast.");
+				updatedCardStates.push({ cardID: booster[idx].uniqueID, state: booster[idx].state });
+			}
 			Connections[userID].pickedCards.main.push(booster[idx]);
 			s.players[userID].botInstance.forcePick(
 				idx,
@@ -2692,7 +2780,7 @@ export class Session implements IIndexable {
 		const pickData: DraftPick = {
 			packNum: s.boosterNumber,
 			pickNum: s.players[userID].pickNumber,
-			pick: pickedCards,
+			pick: pickedCards.filter((card) => !hasEffect(booster[card], OnPickDraftEffect.IgnoreCard)),
 			burn: burnedCards,
 			booster: booster.map((c) => c.id),
 		};
@@ -2716,54 +2804,68 @@ export class Session implements IIndexable {
 			});
 		}
 
-		if (s.players[userID].effect?.aetherSearcher) {
-			const target = s.players[userID].effect!.aetherSearcher!.card;
-			if (!target.state) target.state = {};
-			target.state.cardName = booster[pickedCards[0]].name;
-			updatedCardStates.push({ cardID: target.uniqueID, state: target.state });
-			const msg = new ToastMessage(
-				`${Connections[userID].userName} picked '${target.state.cardName}' and noted its name on their '${target.name}'!`
-			);
-			this.emitToConnectedUsers("message", msg);
-			s.players[userID].effect!.aetherSearcher = undefined;
-			noteCardRiders(booster[pickedCards[0]]);
-		}
-		if (s.players[userID].effect?.makeshiftConfiguration) {
-			const target = s.players[userID].effect!.makeshiftConfiguration!.card;
-			if (!target.state) target.state = {};
-
-			for (const card of pickedCards.map((idx) => booster[idx])) {
-				if (target.state.manaValue == undefined) {
-					target.state.manaValue = (card.mana_cost ?? 0) == "" ? 0 : (card.mana_cost ?? 0);
-					const msg = new ToastMessage(
-						`${Connections[userID].userName} picked '${card.name}' and noted its manavalue ('${target.state.manaValue}') on their '${target.name}'!`
-					);
-					this.emitToConnectedUsers("message", msg);
-					noteCardRiders(card);
-				} else if (target.state.power == undefined) {
-					target.state.power = (card.power ?? 0) == "" ? 0 : (card.power ?? 0);
-					const msg = new ToastMessage(
-						`${Connections[userID].userName} picked '${card.name}' and noted its power ('${target.state.power}') on their '${target.name}'!`
-					);
-					this.emitToConnectedUsers("message", msg);
-					noteCardRiders(card);
-				} else if (target.state.toughness == undefined) {
-					target.state.toughness = (card.toughness ?? 0) == "" ? 0 : (card.toughness ?? 0);
-					const msg = new ToastMessage(
-						`${Connections[userID].userName} picked '${card.name}' and noted its toughness ('${target.state.toughness}') on their '${target.name}'!`
-					);
-					this.emitToConnectedUsers("message", msg);
-					noteCardRiders(card);
-					s.players[userID].effect!.makeshiftConfiguration = undefined;
-					break;
-				} else {
-					s.players[userID].effect!.makeshiftConfiguration = undefined;
-					break;
-				}
+		if (pickedCards.filter((card) => !hasEffect(booster[card], OnPickDraftEffect.IgnoreCard)).length > 0)
+			if (s.players[userID].effect?.aetherSearcher) {
+				const target = s.players[userID].effect!.aetherSearcher!.card;
+				if (!target.state) target.state = {};
+				target.state.cardName = booster[pickedCards[0]].name;
+				const msg = new ToastMessage(
+					`${Connections[userID].userName} picked '${target.state.cardName}' and noted its name on their '${target.name}'!`
+				);
+				this.emitToConnectedUsers("message", msg);
+				s.players[userID].effect!.aetherSearcher = undefined;
+				noteCardRiders(booster[pickedCards[0]]);
+				updatedCardStates.push({ cardID: target.uniqueID, state: target.state });
 			}
-			updatedCardStates.push({ cardID: target.uniqueID, state: target.state });
-			console.log(target.state);
-		}
+		if (pickedCards.filter((card) => !hasEffect(booster[card], OnPickDraftEffect.IgnoreCard)).length > 0)
+			if (s.players[userID].effect?.makeshiftConfiguration) {
+				const target = s.players[userID].effect!.makeshiftConfiguration!.card;
+				if (!target.state) target.state = {};
+
+				for (const card of pickedCards.map((idx) => booster[idx])) {
+					if (target.state.manaValue == undefined) {
+						//target.state.manaValue = (card.mana_cost ?? 0) == "" ? 0 : (card.mana_cost ?? 0);
+						target.state.manaValue = parseManaValue(card.mana_cost ?? 0);
+						const msg = new ToastMessage(
+							`${Connections[userID].userName} picked '${card.name}' and noted its manavalue ('${target.state.manaValue}') on their '${target.name}'!`
+						);
+						this.emitToConnectedUsers("message", msg);
+						noteCardRiders(card);
+					} else if (target.state.power == undefined) {
+						target.state.power = (card.power ?? 0) == "" ? 0 : (card.power ?? 0);
+						const msg = new ToastMessage(
+							`${Connections[userID].userName} picked '${card.name}' and noted its power ('${target.state.power}') on their '${target.name}'!`
+						);
+						this.emitToConnectedUsers("message", msg);
+						noteCardRiders(card);
+					} else if (target.state.toughness == undefined) {
+						target.state.toughness = (card.toughness ?? 0) == "" ? 0 : (card.toughness ?? 0);
+						const msg = new ToastMessage(
+							`${Connections[userID].userName} picked '${card.name}' and noted its toughness ('${target.state.toughness}') on their '${target.name}'!`
+						);
+						this.emitToConnectedUsers("message", msg);
+						noteCardRiders(card);
+						s.players[userID].effect!.makeshiftConfiguration = undefined;
+						break;
+					} else {
+						s.players[userID].effect!.makeshiftConfiguration = undefined;
+						break;
+					}
+				}
+				updatedCardStates.push({ cardID: target.uniqueID, state: target.state });
+			}
+		if (pickedCards.filter((card) => !hasEffect(booster[card], OnPickDraftEffect.IgnoreCard)).length > 0)
+			for (const ephemeration of Object.values(s.draft_effects?.graspingEphemeration ?? []))
+				if (!ephemeration.players[userID]) {
+					ephemeration.players[userID] = {
+						card: booster[
+							pickedCards.filter((card) => !hasEffect(booster[card], OnPickDraftEffect.IgnoreCard))[0]
+						],
+					};
+					RevealEffects(booster[pickedCards[0]]);
+					if (Object.keys(ephemeration.players).length == Object.keys(s.players).length)
+						await this.EphemerationComplete(ephemeration);
+				}
 
 		for (const card of pickedCards.map((idx) => booster[idx])) {
 			if (card.draft_effects) {
@@ -2781,6 +2883,42 @@ export class Session implements IIndexable {
 							notify = true;
 							RevealEffects(booster[pickedCards[0]]);
 							break;
+						case OnPickDraftEffect.GraspingEphemeration:
+							if (!s.draft_effects) s.draft_effects = {};
+							if (!s.draft_effects.graspingEphemeration) s.draft_effects.graspingEphemeration = [];
+							s.draft_effects.graspingEphemeration.push({ ownerID: userID, card: card, players: {} });
+							break;
+						case OnPickDraftEffect.MysticalMenagerie:
+							if (!s.players[userID].effect) s.players[userID].effect = {};
+							if (!s.players[userID].effect.mysticalMenagerie)
+								s.players[userID].effect.mysticalMenagerie = 0;
+							s.players[userID].effect.mysticalMenagerie++;
+							break;
+						case OnPickDraftEffect.ScrapyardBartender: {
+							let result: number | null;
+							do {
+								const response = await new Promise<{ value: number } | null>((resolve) => {
+									Connections[userID].socket.timeout(60 * 1000).emit(
+										"pickNumber",
+										{
+											title: "Scrapyard Bartender",
+											message: "Pick a mana value",
+											defaultValue: 3,
+											min: 0,
+										},
+										(err: Error | null, result: { value: number } | null) => {
+											if (err || !result) resolve(null);
+											else resolve(result);
+										}
+									);
+								});
+								result = response?.value ?? 0;
+							} while (result == null);
+							if (!s.draft_effects) s.draft_effects = {};
+							if (!s.draft_effects.tabValues) s.draft_effects.tabValues = [];
+							if (!s.draft_effects.tabValues.includes(result)) s.draft_effects.tabValues.push(result);
+							break;
+						}
 						case OnPickDraftEffect.ChaoticWrapper:
 							type PoolEntry = {
 								card: UniqueCard;
@@ -2979,6 +3117,8 @@ export class Session implements IIndexable {
 							);
 							break;
 						}
+						case OnPickDraftEffect.IgnoreCard:
+							break;
 						default:
 							if (isSomeEnum(OnPickDraftEffect)(effect))
 								console.info("Unimplemented on pick draft effect: " + effect);
@@ -3017,6 +3157,170 @@ export class Session implements IIndexable {
 		} else if (s.players[userID].effect?.extraPicks) s.players[userID].effect.extraPicks = 0;
 
 		return new SocketAck();
+	}
+
+	async EphemerationComplete(ephemeration: {
+		ownerID: UserID;
+		card: UniqueCard;
+		players: { [userID: UserID]: { card: UniqueCard } };
+	}): Promise<undefined | true> {
+		const s = this.draftState;
+		if (!this.drafting || !isDraftState(s)) return undefined;
+		//Some client call for selection
+		//const chosen: UserID = Object.keys(ephemeration.players)[0];
+		//const chosen: UserID = ephemeration.ownerID;
+		const chosen: UserID =
+			(s.players[ephemeration.ownerID].isBot
+				? undefined
+				: (
+						await new Promise<{ userID: UserID } | null>((resolve) => {
+							Connections[ephemeration.ownerID].socket.timeout(60 * 1000).emit(
+								"pickEphemerationPlayer",
+								{
+									title: "Grasping Ephemeration",
+									message: "Choose a drafted card to exchange with Grasping Ephemeration.",
+									choices: Object.keys(ephemeration.players).map((pid) => ({
+										userID: pid as UserID,
+										userName: s.players[pid].isBot
+											? s.players[pid].botInstance.name
+											: (Connections[pid]?.userName ?? pid),
+										cardName: ephemeration.players[pid].card.name,
+									})),
+								},
+								(err: Error | null, response: { userID: UserID } | null) => {
+									if (err || !response) resolve(null);
+									else resolve(response);
+								}
+							);
+						})
+					)?.userID) ?? Object.keys(ephemeration.players)[0];
+
+		const findCard = (
+			ccard: UniqueCard,
+			drafter?: UserID
+		):
+			| undefined
+			| { player: UserID; location: "main" | "side" | "bot" }
+			| { player: UserID; booster: number; location: "booster" } => {
+			if (drafter) {
+				if (s.players[drafter].isBot) {
+					if (s.players[drafter].botInstance.cards.some((card) => card.id == ccard.id))
+						/*r*/ return { player: drafter, location: "bot" };
+				} else {
+					if (Connections[drafter].pickedCards.main.some((card) => card.uniqueID == ccard.uniqueID))
+						/*r*/ return { player: drafter, location: "main" };
+					//else
+					if (Connections[drafter].pickedCards.side.some((card) => card.uniqueID == ccard.uniqueID))
+						/*r*/ return { player: drafter, location: "side" };
+				}
+				const boosters = s.players[drafter].boosters;
+				for (let i = 0; i < boosters.length; i++) {
+					if (boosters[i].some((c) => c.uniqueID === ccard.uniqueID)) {
+						return { player: drafter, booster: i, location: "booster" };
+					}
+				}
+			}
+			for (const player of Object.keys(ephemeration.players)) {
+				if (s.players[player].isBot) {
+					if (s.players[player].botInstance.cards.some((card) => card.id == ccard.id))
+						return { player, location: "bot" };
+				} else {
+					if (Connections[player].pickedCards.main.some((card) => card.uniqueID == ccard.uniqueID))
+						/*r*/ return { player, location: "main" };
+					//else
+					if (Connections[player].pickedCards.side.some((card) => card.uniqueID == ccard.uniqueID))
+						/*r*/ return { player, location: "side" };
+				}
+				const boosters = s.players[player].boosters;
+				for (let i = 0; i < boosters.length; i++) {
+					if (boosters[i].some((c) => c.uniqueID === ccard.uniqueID)) {
+						return { player, booster: i, location: "booster" };
+					}
+				}
+			}
+			return undefined;
+		};
+
+		const graspingLoc = findCard(ephemeration.card, ephemeration.ownerID);
+		const chosenLoc = findCard(ephemeration.players[chosen].card, chosen);
+		console.log(ephemeration.players[chosen].card.name);
+
+		const removeByID = (list: Card[] | UniqueCard[], target: UniqueCard): UniqueCard | undefined => {
+			if (isArrayOf(isUniqueCard)(list)) {
+				const idx = list.findIndex((card) => card.uniqueID === target.uniqueID);
+				if (idx < 0) return undefined;
+				return list.splice(idx, 1)[0];
+			} else if (isArrayOf(isCard)(list)) {
+				const idx = list.findIndex((c) => c.id === target.id);
+				if (idx < 0) return undefined;
+				return getUnique(list.splice(idx, 1)[0].id, { getCard: this.getCustomGetCardFunction() });
+			}
+			return undefined;
+		};
+
+		if (!graspingLoc || !chosenLoc) {
+			console.log("Error: Unfound");
+			console.log(graspingLoc);
+			console.log(chosenLoc);
+			return undefined;
+		}
+		const removedGrasping =
+			graspingLoc.location === "main"
+				? removeByID(Connections[graspingLoc.player].pickedCards.main, ephemeration.card)
+				: graspingLoc.location === "side"
+					? removeByID(Connections[graspingLoc.player].pickedCards.side, ephemeration.card)
+					: graspingLoc.location === "booster"
+						? removeByID(s.players[graspingLoc.player].boosters[graspingLoc.booster], ephemeration.card)
+						: /*	  bot	*/ removeByID(s.players[graspingLoc.player].botInstance.cards, ephemeration.card);
+
+		const removedChosen =
+			chosenLoc.location === "main"
+				? removeByID(Connections[chosenLoc.player].pickedCards.main, ephemeration.players[chosen].card)
+				: chosenLoc.location === "side"
+					? removeByID(Connections[chosenLoc.player].pickedCards.side, ephemeration.players[chosen].card)
+					: chosenLoc.location === "booster"
+						? removeByID(
+								s.players[chosenLoc.player].boosters[chosenLoc.booster],
+								ephemeration.players[chosen].card
+							)
+						: /*	bot	*/ removeByID(
+								s.players[chosenLoc.player].botInstance.cards,
+								ephemeration.players[chosen].card
+							);
+		if (!removedGrasping || !removedChosen) {
+			console.log("Error: Unremoved");
+			console.log(removedGrasping);
+			console.log(removedChosen);
+			return undefined;
+		}
+
+		switch (graspingLoc.location) {
+			case "main":
+				Connections[graspingLoc.player].pickedCards.main.push(removedChosen);
+				break;
+			case "side":
+				Connections[graspingLoc.player].pickedCards.side.push(removedChosen);
+				break;
+			case "bot":
+				const { uniqueID, state, slot, sheet, ...plain } = removedChosen;
+				s.players[graspingLoc.player].botInstance.cards.push(plain as Card);
+				break;
+			case "booster":
+				s.players[graspingLoc.player].boosters[graspingLoc.booster].push(removedChosen);
+		}
+		switch (chosenLoc.location) {
+			case "main":
+			case "side":
+				Connections[chosenLoc.player].pickedCards.main.push(removedGrasping); //Because it must be in the deck
+				break;
+			case "bot":
+				const { uniqueID, state, slot, sheet, ...plain } = removedGrasping;
+				s.players[chosenLoc.player].botInstance.cards.push(plain as Card);
+				break;
+			case "booster":
+				s.players[chosenLoc.player].boosters[chosenLoc.booster].push(removedGrasping);
+		}
+		return true;
 	}
 
 	// Restart a pick chain if necessary
@@ -3102,7 +3406,7 @@ export class Session implements IIndexable {
 			const booster = s.players[userID].boosters[0].filter(
 				(card) =>
 					!hasEffect(card, ParameterizedDraftEffectType.CantPick) ||
-					card.draft_effects?.some(
+					!card.draft_effects?.some(
 						(effect) =>
 							effect.type == ParameterizedDraftEffectType.CantPick &&
 							((isArray(effect.pick) && effect.pick.includes(s.players[userID].totalPickNumber + 1)) ||
@@ -3165,6 +3469,13 @@ export class Session implements IIndexable {
 				if (!card.state) card.state = {};
 				card.state.faceUp = true;
 			}
+		for (const ephemeration of Object.values(s.draft_effects?.graspingEphemeration ?? []))
+			if (!ephemeration.players[userID]) {
+				ephemeration.players[userID] = { card: booster[pickedIndices[0]] };
+				if (Object.keys(ephemeration.players).length == Object.keys(s.players).length)
+					await this.EphemerationComplete(ephemeration);
+			}
+
 		// We're actually picking on behalf of a disconnected player
 		if (!s.players[userID].isBot && this.isDisconnected(userID))
 			this.disconnectedUsers[userID].pickedCards.main.push(...pickedIndices.map((idx) => booster[idx]));
@@ -3211,7 +3522,7 @@ export class Session implements IIndexable {
 		const s = this.draftState;
 		if (!isDraftState(s)) return;
 		const p = s.players[userID];
-		// Asyncronously ask for bot recommendations, and send then when available
+		// Asyncronously ask for bot recommendations, and send then when availableephemeration.players);
 		if (!this.disableBotSuggestions && p.botInstance && p.boosters.length > 0 && !p.botPickInFlight) {
 			(() => {
 				const localData = {
