@@ -67,6 +67,8 @@ export enum ParameterizedDraftEffectType {
 	ReplaceNotedCard = "ReplaceNotedCard",
 	NoteQualityName = "NoteQualityName",
 	AddCardsOnReveal = "AddCardsOnReveal",
+	BoosterContents = "BoosterContents",
+	//AddPackOnPick
 }
 
 export type DraftEffectType = SimpleDraftEffectType | ParameterizedDraftEffectType;
@@ -85,6 +87,12 @@ export type DraftEffect =
 	  }
 	| {
 			type: ParameterizedDraftEffectType.AddCardsOnReveal;
+			count: number;
+			cards: CardID[];
+			duplicateProtection: boolean;
+	  }
+	| {
+			type: ParameterizedDraftEffectType.BoosterContents;
 			count: number;
 			cards: CardID[];
 			duplicateProtection: boolean;

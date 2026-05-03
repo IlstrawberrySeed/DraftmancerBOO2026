@@ -472,7 +472,28 @@
 						{"kind": "ManaValue", "value": 3}
 					]
 				]
-			}],
+			}]
+		#"oracle_text": ,
+		#"power": "0",
+		#"toughness": "3"
+		#"loyalty": 
+	},
+	{	
+		"name": "Lore 2 Seeker",
+		"mana_cost": "",
+		"type": "Land",
+		#image,
+		"colors": [],
+		"set": "BO3",
+		#collector number,
+		"rarity": "rare",
+		"subtypes": [
+		],
+		"rating": 2,
+		#"layout": ,
+		#"back": ,
+		#"related_cards": ,
+		"draft_effects": ["LoreSeeker", {"type": "BoosterContents", "count": 1, "cards": ["Mountain"]}],
 		#"oracle_text": ,
 		"power": "0",
 		"toughness": "3"
@@ -493,10 +514,11 @@
 1 Pheldagrif's Assistance
 1 Super Chaos Warp
 1 Sage of Thermodynamics
-91 Super Booster Tutor
+1 Super Booster Tutor
 1 Makeshift Configuration
 1 Scrapyard Bartender 
 2 Mystical Menagerie
 2 Grasping Ephemeration
 38 Llanowar Elves
 90 Landscape Vault
+90 Lore 2 Seeker

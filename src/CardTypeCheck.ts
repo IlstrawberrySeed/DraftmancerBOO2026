@@ -65,6 +65,8 @@ export function isDraftEffect(obj: unknown): obj is DraftEffect {
 		return hasProperty("count", isInteger)(obj) && hasProperty("cards", isArrayOf(isString))(obj);
 	if (obj.type === ParameterizedDraftEffectType.AddCardsOnReveal)
 		return hasProperty("count", isInteger)(obj) && hasProperty("cards", isArrayOf(isString))(obj);
+	if (obj.type === ParameterizedDraftEffectType.BoosterContents)
+		return hasProperty("count", isInteger)(obj) && hasProperty("cards", isArrayOf(isString))(obj);
 	if (obj.type === ParameterizedDraftEffectType.NoteQualityName)
 		return hasProperty("qualities", isArrayOf(isArrayOf(isQualityAtom)))(obj);
 	return hasProperty("type", isSimpleDraftEffectType)(obj);
