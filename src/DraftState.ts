@@ -35,11 +35,14 @@ export class DraftState extends IDraftState {
 				randomPicks?: number;
 				canalDredger?: boolean;
 				aetherSearcher?: { card: UniqueCard };
+<<<<<<< HEAD
 				extraPicks?: number;
 				nextExtraPicks?: number;
 				makeshiftConfiguration?: { card: UniqueCard };
 				tab?: number;
 				mysticalMenagerie?: number;
+=======
+>>>>>>> parent of bf2fddb5 (Discerning Hoarder Functional, visual bugs and slightly confusing)
 			};
 		};
 	} = {};
@@ -114,12 +117,10 @@ export class DraftState extends IDraftState {
 
 	picksAndBurnsThisRound(userID: UserID) {
 		const settings = this.getBoosterSettings();
-		const picksThisRound =
-			(this.players[userID].effect?.extraPicks ?? 0) +
-			Math.min(
-				settings.picks[Math.min(this.players[userID].pickNumber, settings.picks.length - 1)],
-				this.players[userID].boosters[0]?.length ?? 0
-			);
+		const picksThisRound = Math.min(
+			settings.picks[Math.min(this.players[userID].pickNumber, settings.picks.length - 1)],
+			this.players[userID].boosters[0]?.length ?? 0
+		);
 		return {
 			picksThisRound,
 			burnsThisRound: Math.min(

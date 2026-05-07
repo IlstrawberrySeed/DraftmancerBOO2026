@@ -479,7 +479,7 @@
 		#"loyalty": 
 	},
 	{	
-		"name": "Lore 2 Seeker",
+		"name": "Lore Seeker",
 		"mana_cost": "",
 		"type": "Land",
 		#image,
@@ -521,4 +521,4 @@
 2 Grasping Ephemeration
 38 Llanowar Elves
 90 Landscape Vault
-90 Lore 2 Seeker
+90 Lore Seeker

@@ -2394,6 +2394,7 @@ export class Session implements IIndexable {
 					});
 					break;
 				}
+<<<<<<< HEAD
 				case UsableDraftEffect.DiscerningHoarder: {
 					//LeovoldsOperative but backwards
 					//Strata BOO3, card by PixelAce
@@ -2438,6 +2439,8 @@ export class Session implements IIndexable {
 					});
 					break;
 				}
+=======
+>>>>>>> parent of bf2fddb5 (Discerning Hoarder Functional, visual bugs and slightly confusing)
 				case UsableDraftEffect.RemoveDraftCard: {
 					const removedCards = pickedCards.map((index) => booster[index]);
 					burnsThisRound += pickedCards.length;
@@ -3173,11 +3176,6 @@ export class Session implements IIndexable {
 			this.startCountdown(userID);
 			this.requestBotRecommendation(userID);
 		}
-
-		if (s.players[userID].effect?.nextExtraPicks) {
-			s.players[userID].effect.extraPicks = s.players[userID].effect?.nextExtraPicks;
-			s.players[userID].effect.nextExtraPicks = 0;
-		} else if (s.players[userID].effect?.extraPicks) s.players[userID].effect.extraPicks = 0;
 
 		return new SocketAck();
 	}
